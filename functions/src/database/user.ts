@@ -17,6 +17,43 @@ const Firestore = require("@google-cloud/firestore");
 // Use your project ID here
 const PROJECTID = "dating-app-622c1";
 
+export interface UserRepoParams {
+  db: any;
+}
+
+export class UserRepo {
+  db: any;
+
+  constructor(p: UserRepoParams) {
+    this.db = p.db;
+  }
+
+  getDatingPreferencesByUuid = async (
+    uuid: string
+  ): Promise<DatingMatchPreferencesEntity> => {
+    const datingMatchPreferencesSnapshot = await this.db
+      .collection("dating_match_preferences")
+      .where("userUUID", "==", uuid)
+      .get();
+
+    const prefs: DatingMatchPreferencesEntity = {};
+    if (datingMatchPreferencesSnapshot.length > 0) {
+      const d = datingMatchPreferencesSnapshot[0];
+      const data = d.data();
+      prefs.UUID = data.UUID;
+      prefs.userUUID = data.userUUID;
+      prefs.genderPreference = data.genderPreference;
+      prefs.gender = data.gender;
+      prefs.age = data.age;
+      prefs.ageMinPreference = data.ageMinPreference;
+      prefs.ageMaxPreference = data.ageMaxPreference;
+      prefs.zipcode = data.zipcode;
+      prefs.zipcodePreference = data.zipcodePreference;
+    }
+    return prefs;
+  };
+}
+
 export const getDatingPreferencesByUuid = async (
   uuid: string
 ): Promise<DatingMatchPreferencesEntity> => {
