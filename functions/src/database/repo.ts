@@ -4,8 +4,11 @@ import {
   DatingMatchPreferencesRecord,
 } from "../types/user";
 import {
+  MatchRecord,
+  BlockRecord,
   // DatingPreferencesFilterEntity,
   UserProfileSearchFilterRecord,
+  LikeRecord,
 } from "../types/match";
 import { VideoEntity } from "../types/video";
 import { stringify } from "querystring";
@@ -17,16 +20,110 @@ const Firestore = require("@google-cloud/firestore");
 // Use your project ID here
 const PROJECTID = "dating-app-622c1";
 
-export interface UserRepoParams {
+export interface RepoParams {
   db: any;
 }
 
-export class UserRepo {
+export class Repo {
   db: any;
 
-  constructor(p: UserRepoParams) {
+  constructor(p: RepoParams) {
     this.db = p.db;
   }
+
+  createMatchRecord = async () => {};
+
+  // make sure to check by status and not deleted
+  getMatchRecordByUuids = async (
+    uuid1: string,
+    uuid2: string
+  ): Promise<MatchRecord> => {
+    return null;
+  };
+
+  // make sure to set delted_at = null
+  getBlockedByUserUuids = async (
+    uuid1: string,
+    uuid2: string
+  ): Promise<BlockRecord> => {
+    let usersSnapshot = await this.db
+      .collection("block")
+      .where("blockedUserUuids", "array-contains", [uuid1, uuid2])
+      .get();
+
+    if (usersSnapshot.length > 0) {
+      const data = usersSnapshot[0].data();
+      const record: BlockRecord = {
+        initatorUuid: data.initatorUuid,
+        responderUuid: data.responderUuid,
+        createdAtUtc: data.createdAtUtc,
+        deletedAtUtc: data.deletedAtUtc,
+        blockedUserUuids: data.blockedUserUUIDs,
+      };
+      return record;
+    }
+    return null;
+  };
+
+  getUserUUIDsBlockedByUserUUID = async (uuid: string): Promise<string[]> => {
+    const ids = new Set<string>();
+
+    let usersSnapshot = await this.db
+      .collection("blocks")
+      .where("blockedUserUuids", "array-contains", uuid)
+      .get();
+
+    const results = new Set<string>();
+
+    usersSnapshot.forEach((doc) => {
+      // console.log(doc.id, '=>', doc.data());
+      const blockedUUIDs = doc
+        .data()
+        .blockedUserUUIDs.filter((blockedUUID) => blockedUUID != uuid);
+      blockedUUIDs.forEach((item) => results.add(item));
+    });
+    return Array.from(results);
+  };
+
+  createLikeRecord = async () => {};
+  createLikeAndMatchRecords = async () => {};
+  getLikeRecord = async (
+    initiator: string,
+    receiver: string
+  ): Promise<LikeRecord> => {
+    let likeSnapshot = await this.db
+      .collection("likes")
+      .where("initiator", "==", initiator)
+      .where("receiver", "==", receiver)
+      .get();
+
+    if (likeSnapshot.length > 0) {
+      const data = likeSnapshot[0].data();
+      const like: LikeRecord = {};
+      return like;
+    }
+    return null;
+  };
+
+  deleteUser = async (uuid: string) => {
+    const snapshot = await this.db
+      .collection("users")
+      .where("uuid", "==", uuid)
+      .get();
+
+    const docID = snapshot[0].id;
+    await this.db.collection("users").doc(docID).update({
+      deletedAt: new Date().getTime(),
+    });
+  };
+
+  getProfileByUserUUID = async (uuid: string) => {
+    const snapshot = await this.db
+      .collection("users")
+      .where("uuid", "==", uuid)
+      .get();
+    return snapshot[0].data();
+  };
 
   getDatingPreferencesByUuid = async (
     uuid: string
@@ -38,10 +135,9 @@ export class UserRepo {
 
     const prefs: DatingMatchPreferencesEntity = {};
     if (datingMatchPreferencesSnapshot.length > 0) {
-      const d = datingMatchPreferencesSnapshot[0];
-      const data = d.data();
-      prefs.UUID = data.UUID;
-      prefs.userUUID = data.userUUID;
+      const data = datingMatchPreferencesSnapshot[0].data();
+      prefs.uuid = data.UUID;
+      prefs.userUuid = data.userUUID;
       prefs.genderPreference = data.genderPreference;
       prefs.gender = data.gender;
       prefs.age = data.age;
@@ -66,8 +162,8 @@ export const getDatingPreferencesByUuid = async (
   const prefs: DatingMatchPreferencesEntity = {};
   if (datingMatchPreferencesSnapshot.length > 0) {
     const data = datingMatchPreferencesSnapshot[0].data();
-    prefs.UUID = data.UUID;
-    prefs.userUUID = data.userUUID;
+    prefs.uuid = data.UUID;
+    prefs.userUuid = data.userUUID;
     prefs.genderPreference = data.genderPreference;
     prefs.gender = data.gender;
     prefs.age = data.age;
@@ -124,6 +220,7 @@ export const getUsersByUuids = async (userUuids: string[]) => {
   return usersSnapshot;
 };
 
+// the problem here is that these can just be likes
 export const getUserUUIDsMatchedToUUID = async (
   uuid: string
 ): Promise<string[]> => {
@@ -141,28 +238,6 @@ export const getUserUUIDsMatchedToUUID = async (
       .data()
       .matchedUsersUUIDs.filter((matchedUserUUID) => matchedUserUUID != uuid);
     matchedUserUUIDs.forEach((item) => results.add(item));
-  });
-  return Array.from(results);
-};
-
-export const getUserUUIDsBlockedByUserUUID = async (
-  uuid: string
-): Promise<string[]> => {
-  const ids = new Set<string>();
-  var db = admin.firestore();
-  let usersSnapshot = await db
-    .collection("blocked_users")
-    .where("blockedUserUUIDs", "array-contains", uuid)
-    .get();
-
-  const results = new Set<string>();
-
-  usersSnapshot.forEach((doc) => {
-    // console.log(doc.id, '=>', doc.data());
-    const blockedUUIDs = doc
-      .data()
-      .blockedUserUUIDs.filter((blockedUUID) => blockedUUID != uuid);
-    blockedUUIDs.forEach((item) => results.add(item));
   });
   return Array.from(results);
 };
@@ -190,8 +265,8 @@ export const getUserProfileEntities = async (
 
   datingMatchPreferencesSnapshot.forEach((doc) => {
     const datingPrefEntity: DatingMatchPreferencesEntity = {
-      UUID: doc.data().UUID,
-      userUUID: doc.data().userUUID,
+      uuid: doc.data().uuid,
+      userUuid: doc.data().userUuid,
       genderPreference: doc.data().genderPreference,
       gender: doc.data().gender,
       ageMinPreference: doc.data().ageMinPreference,
@@ -200,7 +275,7 @@ export const getUserProfileEntities = async (
       zipcodePreference: doc.data().zipcodePreference,
       age: doc.data().age,
     };
-    userUUIDToDatingPref.set(doc.data().userUUID, datingPrefEntity);
+    userUUIDToDatingPref.set(doc.data().userUuid, datingPrefEntity);
   });
 
   // now get video entities
@@ -231,7 +306,7 @@ export const getUserProfileEntities = async (
 
   usersSnapshot.forEach((doc) => {
     const userEntity: UserEntity = {
-      UUID: doc.data().UUID,
+      uuid: doc.data().uuid,
       userDatingPreference: userUUIDToDatingPref.get(doc.data().UUID),
       videoEntities: userUUIDToVideos.get(doc.data().UUID),
     };

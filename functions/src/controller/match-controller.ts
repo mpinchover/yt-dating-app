@@ -9,7 +9,7 @@ import {
   getUserUUIDsMatchedToUUID,
   getUserUUIDsBlockedByUserUUID,
   getUserProfileEntities,
-} from "../database/user";
+} from "../database/repo";
 import levenshtein from "fast-levenshtein";
 import { userRecordConstructor } from "firebase-functions/v1/auth";
 
@@ -51,7 +51,7 @@ export const generateUserMatchingItem = (
   user: UserEntity
 ): UserMatchingItemEntity => {
   const res: UserMatchingItemEntity = {
-    userUUID: user.UUID,
+    userUUID: user.uuid,
     videoEntities: user.videoEntities,
   };
   return res;
@@ -65,10 +65,10 @@ export const getCandidateMatchingItems = async (
   // make sure to get prefernces that do not show either of those
 
   const alreadyMatchedUserUUIDs: string[] = await getUserUUIDsMatchedToUUID(
-    user.UUID
+    user.uuid
   );
   const blockedByUserUUIDs: string[] = await getUserUUIDsBlockedByUserUUID(
-    user.UUID
+    user.uuid
   );
 
   const userUUIDsToFilterOut: string[] = [
@@ -76,7 +76,7 @@ export const getCandidateMatchingItems = async (
     ...blockedByUserUUIDs,
   ];
 
-  const uDatingPref = await getDatingPreferencesByUuid(user.UUID);
+  const uDatingPref = await getDatingPreferencesByUuid(user.uuid);
   user.userDatingPreference = uDatingPref;
   const searchFilter: UserProfileSearchFilterRecord = createSearchFilter(
     user,

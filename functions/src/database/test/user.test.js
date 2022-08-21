@@ -1,5 +1,5 @@
-const { testAdd } = require("../user.ts");
-const { UserRepo } = require("../user");
+const { testAdd } = require("../repo.ts");
+const { UserRepo } = require("../repo");
 const expect = require("chai").expect;
 var sinonChai = require("sinon-chai");
 const sinon = require("sinon");

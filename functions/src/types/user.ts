@@ -8,8 +8,8 @@ user {
 import { VideoEntity } from "./video";
 
 export interface DatingMatchPreferencesRecord {
-  UUID?: string;
-  userUUID?: string;
+  uuid?: string;
+  userUuid?: string;
   genderPreference?: string;
   gender?: string;
   ageMinPreference: number;
@@ -17,8 +17,8 @@ export interface DatingMatchPreferencesRecord {
 }
 
 export interface DatingMatchPreferencesEntity {
-  UUID?: string;
-  userUUID?: string;
+  uuid?: string;
+  userUuid?: string;
   genderPreference?: string;
   gender?: string;
   ageMinPreference?: number;
@@ -29,21 +29,25 @@ export interface DatingMatchPreferencesEntity {
 }
 
 export interface UserRecord {
-  UUID?: string;
+  uuid?: string;
   mobile?: string;
+  email?: string;
+  verified?: boolean;
+  lastSeenAtUTC?: Date;
+
+  // repo layer stuff
+  deletedAtUtc?: Date;
 }
 
-export interface BlockedUserRecord {
-  initatorUUID?: string;
-  responderUUID?: string;
-  createdAtUtc?: string;
-  deletedAtUtc?: string;
-  blockedUserUUIDs: string[]; // just for now until better db, bc query depends on it
-}
 
 export interface UserEntity {
-  UUID?: string;
+  uuid?: string;
   mobile?: string;
+  email?: string;
+  verified?: boolean;
+  lastSeenAtUTC?: Date;
+
+  // hydrate
   userDatingPreference?: DatingMatchPreferencesEntity;
   videoEntities?: VideoEntity[];
 }

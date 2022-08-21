@@ -4,7 +4,7 @@ export interface MatchRecord {
   initatorUUID?: string;
   responderUUID?: string;
   createdAtUtc?: string;
-  deletedAtUtc?: string;
+  deletedAtUtc?: Date;
   matchedUsersUUIDs: string[]; // just for now until better db, bc query depends on it
 }
 
@@ -20,4 +20,20 @@ export interface UserProfileSearchFilterRecord {
   ageMinPreference: number;
   ageMaxPreference: number;
   userUUIDsToFilterOut: string[];
+}
+
+export interface LikeRecord {
+  createdAtUtc: Date;
+  updatedAtUtc: Date;
+  deletedAtUTtc?: Date;
+  initiatorUuid?: string;
+  receiverUuid?: string;
+}
+
+export interface BlockRecord {
+  initatorUuid?: string;
+  responderUuid?: string;
+  createdAtUtc?: string;
+  deletedAtUtc?: Date;
+  blockedUserUuids: string[]; // just for now until better db, bc query depends on it
 }
