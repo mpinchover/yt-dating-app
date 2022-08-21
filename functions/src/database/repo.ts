@@ -1,6 +1,7 @@
 import {
   DatingMatchPreferencesEntity,
   UserEntity,
+  UserRecord,
   DatingMatchPreferencesRecord,
 } from "../types/user";
 import {
@@ -24,6 +25,10 @@ export interface RepoParams {
   db: any;
 }
 
+// interface RepoFunctions {
+//   getLikeRecord: (initiator: string, receiver: string) => Promise<LikeRecord>;
+// }
+
 export class Repo {
   db: any;
 
@@ -31,13 +36,38 @@ export class Repo {
     this.db = p.db;
   }
 
-  createMatchRecord = async () => {};
+  createMatchRecord = async (params: MatchRecord) => {
+    this.db.collection("matches").add(params);
+  };
+
+  getUserUuidsMatchedToUuid = async (uuid: string): Promise<string[]> => {
+    const ids = new Set<string>();
+    var db = admin.firestore();
+    let usersSnapshot = await this.db
+      .collection("match")
+      .where("matchedUsersUUIDs", "array-contains", uuid)
+      .get();
+
+    const results = new Set<string>();
+    usersSnapshot.forEach((doc) => {
+      // console.log(doc.id, '=>', doc.data());
+      const matchedUserUUIDs = doc
+        .data()
+        .matchedUsersUUIDs.filter((matchedUserUUID) => matchedUserUUID != uuid);
+      matchedUserUUIDs.forEach((item) => results.add(item));
+    });
+    return Array.from(results);
+  };
 
   // make sure to check by status and not deleted
   getMatchRecordByUuids = async (
     uuid1: string,
     uuid2: string
   ): Promise<MatchRecord> => {
+    const matchSnapshot = this.db
+      .collection("matches")
+      .where("matchedUsersUuids", "array-contains", [uuid1, uuid2])
+      .get();
     return null;
   };
 
@@ -65,7 +95,7 @@ export class Repo {
     return null;
   };
 
-  getUserUUIDsBlockedByUserUUID = async (uuid: string): Promise<string[]> => {
+  getUsersWhoBlockedThisUuid = async (uuid: string): Promise<string[]> => {
     const ids = new Set<string>();
 
     let usersSnapshot = await this.db
@@ -85,8 +115,20 @@ export class Repo {
     return Array.from(results);
   };
 
-  createLikeRecord = async () => {};
-  createLikeAndMatchRecords = async () => {};
+  createLikeRecord = async (params: LikeRecord) => {
+    const res = await this.db.collection("likes").add(params);
+  };
+
+  createLikeAndMatchRecords = async (
+    likeParams: LikeRecord,
+    matchParams: MatchRecord
+  ) => {
+    await this.db.runTransaction(async (t) => {
+      await t.collection("likes").add(likeParams);
+      await t.collection("matches").add(matchParams);
+    });
+  };
+
   getLikeRecord = async (
     initiator: string,
     receiver: string
@@ -99,10 +141,20 @@ export class Repo {
 
     if (likeSnapshot.length > 0) {
       const data = likeSnapshot[0].data();
-      const like: LikeRecord = {};
+      const like: LikeRecord = {
+        createdAtUtc: data.createdAtUtc,
+        updatedAtUtc: data.updatedAtUtc,
+        deletedAtUtc: data.updatedAtUtc,
+        initiatorUuid: data.initiatorUuid,
+        receiverUuid: data.receiverUuid,
+      };
       return like;
     }
     return null;
+  };
+
+  createUser = async (params: UserRecord) => {
+    await this.db.collection("users").add(params);
   };
 
   deleteUser = async (uuid: string) => {
@@ -125,6 +177,81 @@ export class Repo {
     return snapshot[0].data();
   };
 
+  getUserProfileEntities = async (
+    filters: UserProfileSearchFilterRecord
+  ): Promise<UserEntity[]> => {
+    const users: UserEntity[] = [];
+
+    const userUUIDToDatingPref = new Map<
+      string,
+      DatingMatchPreferencesEntity
+    >();
+    const userUUIDToVideos = new Map<string, VideoEntity[]>();
+
+    var db = admin.firestore();
+    const datingMatchPreferencesSnapshot = await this.db
+      .collection("dating_match_preferences")
+      .where("gender", "array-contains", filters.genderPreference)
+      .where("genderPreference", "==", filters.gender)
+      .where("age", "<=", filters.ageMaxPreference)
+      .where("age", ">=", filters.ageMinPreference)
+      .where("ageMinPreference", "<=", filters.age)
+      .where("ageMaxPreference", ">=", filters.age)
+      .where("userUUID", "not-in", filters.userUuidsToFilterOut)
+      .get();
+
+    datingMatchPreferencesSnapshot.forEach((doc) => {
+      const datingPrefEntity: DatingMatchPreferencesEntity = {
+        uuid: doc.data().uuid,
+        userUuid: doc.data().userUuid,
+        genderPreference: doc.data().genderPreference,
+        gender: doc.data().gender,
+        ageMinPreference: doc.data().ageMinPreference,
+        ageMaxPreference: doc.data().ageMaxPreference,
+        zipcode: doc.data().zipcode,
+        zipcodePreference: doc.data().zipcodePreference,
+        age: doc.data().age,
+      };
+      userUUIDToDatingPref.set(doc.data().userUuid, datingPrefEntity);
+    });
+
+    // now get video entities
+    const videosSnapshot = await this.db
+      .collections("videos")
+      .where("userUUID", "in", Array.from(userUUIDToDatingPref.keys()));
+
+    videosSnapshot.forEach((doc) => {
+      const video: VideoEntity = {
+        uuid: doc.data().uuid,
+        userUUID: doc.data().userUUID,
+        videoId: doc.data().videoId,
+        channelId: doc.data().channelId,
+        videoTitle: doc.data().videoTitle,
+        description: doc.data().description,
+        categoryId: doc.data().categoryId,
+        topicCategories: doc.data().topicCategories,
+      };
+
+      if (!userUUIDToVideos.has(video.userUUID))
+        userUUIDToVideos.set(video.userUUID, []);
+      userUUIDToVideos.get(video.userUUID).push(video);
+    });
+
+    const usersSnapshot = await this.db
+      .collection("users")
+      .where("uuid", "in", Array.from(userUUIDToDatingPref.keys()));
+
+    usersSnapshot.forEach((doc) => {
+      const userEntity: UserEntity = {
+        uuid: doc.data().uuid,
+        userDatingPreference: userUUIDToDatingPref.get(doc.data().UUID),
+        videoEntities: userUUIDToVideos.get(doc.data().UUID),
+      };
+      users.push(userEntity);
+    });
+    return users;
+  };
+
   getDatingPreferencesByUuid = async (
     uuid: string
   ): Promise<DatingMatchPreferencesEntity> => {
@@ -133,6 +260,7 @@ export class Repo {
       .where("userUUID", "==", uuid)
       .get();
 
+    // handle by mapper
     const prefs: DatingMatchPreferencesEntity = {};
     if (datingMatchPreferencesSnapshot.length > 0) {
       const data = datingMatchPreferencesSnapshot[0].data();
@@ -220,101 +348,47 @@ export const getUsersByUuids = async (userUuids: string[]) => {
   return usersSnapshot;
 };
 
-// the problem here is that these can just be likes
-export const getUserUUIDsMatchedToUUID = async (
-  uuid: string
-): Promise<string[]> => {
-  const ids = new Set<string>();
-  var db = admin.firestore();
-  let usersSnapshot = await db
-    .collection("match")
-    .where("matchedUsersUUIDs", "array-contains", uuid)
-    .get();
+// export const getUserUuidsMatchedToUuid = async (
+//   uuid: string
+// ): Promise<string[]> => {
+//   const ids = new Set<string>();
+//   var db = admin.firestore();
+//   let usersSnapshot = await db
+//     .collection("match")
+//     .where("matchedUsersUUIDs", "array-contains", uuid)
+//     .get();
 
-  const results = new Set<string>();
-  usersSnapshot.forEach((doc) => {
-    // console.log(doc.id, '=>', doc.data());
-    const matchedUserUUIDs = doc
-      .data()
-      .matchedUsersUUIDs.filter((matchedUserUUID) => matchedUserUUID != uuid);
-    matchedUserUUIDs.forEach((item) => results.add(item));
-  });
-  return Array.from(results);
-};
+//   const results = new Set<string>();
+//   usersSnapshot.forEach((doc) => {
+//     // console.log(doc.id, '=>', doc.data());
+//     const matchedUserUUIDs = doc
+//       .data()
+//       .matchedUsersUUIDs.filter((matchedUserUUID) => matchedUserUUID != uuid);
+//     matchedUserUUIDs.forEach((item) => results.add(item));
+//   });
+//   return Array.from(results);
+// };
 
-// break up this fn
-export const getUserProfileEntities = async (
-  filters: UserProfileSearchFilterRecord
-): Promise<UserEntity[]> => {
-  const users: UserEntity[] = [];
-
-  const userUUIDToDatingPref = new Map<string, DatingMatchPreferencesEntity>();
-  const userUUIDToVideos = new Map<string, VideoEntity[]>();
-
-  var db = admin.firestore();
-  const datingMatchPreferencesSnapshot = await db
-    .collection("dating_match_preferences")
-    .where("gender", "array-contains", filters.genderPreference)
-    .where("genderPreference", "==", filters.gender)
-    .where("age", "<=", filters.ageMaxPreference)
-    .where("age", ">=", filters.ageMinPreference)
-    .where("ageMinPreference", "<=", filters.age)
-    .where("ageMaxPreference", ">=", filters.age)
-    .where("userUUID", "not-in", filters.userUUIDsToFilterOut)
-    .get();
-
-  datingMatchPreferencesSnapshot.forEach((doc) => {
-    const datingPrefEntity: DatingMatchPreferencesEntity = {
-      uuid: doc.data().uuid,
-      userUuid: doc.data().userUuid,
-      genderPreference: doc.data().genderPreference,
-      gender: doc.data().gender,
-      ageMinPreference: doc.data().ageMinPreference,
-      ageMaxPreference: doc.data().ageMaxPreference,
-      zipcode: doc.data().zipcode,
-      zipcodePreference: doc.data().zipcodePreference,
-      age: doc.data().age,
-    };
-    userUUIDToDatingPref.set(doc.data().userUuid, datingPrefEntity);
-  });
-
-  // now get video entities
-  const videosSnapshot = await db
-    .collections("videos")
-    .where("userUUID", "in", Array.from(userUUIDToDatingPref.keys()));
-
-  videosSnapshot.forEach((doc) => {
-    const video: VideoEntity = {
-      uuid: doc.data().uuid,
-      userUUID: doc.data().userUUID,
-      videoId: doc.data().videoId,
-      channelId: doc.data().channelId,
-      videoTitle: doc.data().videoTitle,
-      description: doc.data().description,
-      categoryId: doc.data().categoryId,
-      topicCategories: doc.data().topicCategories,
-    };
-
-    if (!userUUIDToVideos.has(video.userUUID))
-      userUUIDToVideos.set(video.userUUID, []);
-    userUUIDToVideos.get(video.userUUID).push(video);
-  });
-
-  const usersSnapshot = await db
-    .collection("users")
-    .where("uuid", "in", Array.from(userUUIDToDatingPref.keys()));
-
-  usersSnapshot.forEach((doc) => {
-    const userEntity: UserEntity = {
-      uuid: doc.data().uuid,
-      userDatingPreference: userUUIDToDatingPref.get(doc.data().UUID),
-      videoEntities: userUUIDToVideos.get(doc.data().UUID),
-    };
-    users.push(userEntity);
-  });
-  return users;
-};
+//
 
 export const testAdd = (a: number, b: number): number => {
   return a + b;
 };
+
+// export interface createUserParams {
+//   uuid?: string;
+//   mobile?: string;
+//   email?: string;
+//   verified?: boolean;
+// }
+
+// export interface createLikeParams {
+//   initiatorUuid?: string;
+//   receiverUuid?: string;
+// }
+
+// export interface createMatchParams {
+//   initiatorUuid?: string;
+//   responderUuid?: string;
+//   matchedUsersUuids?: string[];
+// }

@@ -33,19 +33,18 @@ export interface UserRecord {
   mobile?: string;
   email?: string;
   verified?: boolean;
-  lastSeenAtUTC?: Date;
+  lastSeenAtUtc?: Date;
 
   // repo layer stuff
   deletedAtUtc?: Date;
 }
-
 
 export interface UserEntity {
   uuid?: string;
   mobile?: string;
   email?: string;
   verified?: boolean;
-  lastSeenAtUTC?: Date;
+  lastSeenAtUtc?: Date;
 
   // hydrate
   userDatingPreference?: DatingMatchPreferencesEntity;

@@ -1,15 +1,16 @@
 import { VideoEntity } from "./video";
 
 export interface MatchRecord {
-  initatorUUID?: string;
-  responderUUID?: string;
-  createdAtUtc?: string;
+  initiatorUuid?: string;
+  responderUuid?: string;
+  createdAtUtc?: Date;
   deletedAtUtc?: Date;
-  matchedUsersUUIDs: string[]; // just for now until better db, bc query depends on it
+  updatedAtUtc?: Date;
+  matchedUsersUuids: string[]; // just for now until better db, bc query depends on it
 }
 
 export interface UserMatchingItemEntity {
-  userUUID: string;
+  userUuid: string;
   videoEntities: VideoEntity[];
 }
 
@@ -19,13 +20,13 @@ export interface UserProfileSearchFilterRecord {
   age: number;
   ageMinPreference: number;
   ageMaxPreference: number;
-  userUUIDsToFilterOut: string[];
+  userUuidsToFilterOut: string[];
 }
 
 export interface LikeRecord {
-  createdAtUtc: Date;
-  updatedAtUtc: Date;
-  deletedAtUTtc?: Date;
+  createdAtUtc?: Date;
+  updatedAtUtc?: Date;
+  deletedAtUtc?: Date;
   initiatorUuid?: string;
   receiverUuid?: string;
 }
@@ -33,7 +34,8 @@ export interface LikeRecord {
 export interface BlockRecord {
   initatorUuid?: string;
   responderUuid?: string;
-  createdAtUtc?: string;
+  createdAtUtc?: Date;
+  updatedAtUtc?: Date;
   deletedAtUtc?: Date;
   blockedUserUuids: string[]; // just for now until better db, bc query depends on it
 }

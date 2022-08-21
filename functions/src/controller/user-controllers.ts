@@ -3,6 +3,7 @@ import { Repo } from "../database/repo";
 import { AWSGateway } from "../gateway/aws";
 import { userEntityToRecord } from "../utils/mapper-user";
 import { v4 as uuidv4 } from "uuid";
+import { LikeRecord, MatchRecord } from "../types/match";
 
 export interface UserControllerParams {
   // db: any;
@@ -58,7 +59,7 @@ export class UserController {
 
   likeProfile = async (params: likeProfileParams) => {
     // first make sure this profile is not a current match
-    const existingMatch = await this.repo.getMatchByUuids(
+    const existingMatch = await this.repo.getMatchRecordByUuids(
       params.initiatorUuid,
       params.likedProfileUuid
     );
@@ -76,18 +77,24 @@ export class UserController {
       params.initiatorUuid,
       params.likedProfileUuid
     );
+    const likeParams: LikeRecord = {
+      initiatorUuid: params.initiatorUuid,
+      receiverUuid: params.likedProfileUuid,
+    };
     if (likeRecord) {
       // create like and match in tx
-      await this.repo.createLikeAndMatchRecords(
-        params.initiatorUuid,
-        params.likedProfileUuid
-      );
+
+      // if we see there is a like already made
+      // then that person is the initiator
+      const matchParams: MatchRecord = {
+        initiatorUuid: params.likedProfileUuid, // they already liked the initiator
+        responderUuid: params.initiatorUuid,
+        matchedUsersUuids: [params.initiatorUuid, params.likedProfileUuid],
+      };
+      await this.repo.createLikeAndMatchRecords(likeParams, matchParams);
       return;
     }
-    await this.repo.createLikeRecord(
-      params.initiatorUuid,
-      params.likedProfileUuid
-    );
+    await this.repo.createLikeRecord(likeParams);
     // then either let the other client poll or let them create a websocket
   };
 
