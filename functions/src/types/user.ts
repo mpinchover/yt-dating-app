@@ -14,6 +14,9 @@ export interface DatingMatchPreferencesRecord {
   gender?: string;
   ageMinPreference: number;
   ageMaxPreference: number;
+  zipcode?: string;
+  zipcodePreference?: string;
+  age?: number;
 }
 
 export interface DatingMatchPreferencesEntity {

@@ -33,7 +33,7 @@ export interface LikeRecord {
 
 export interface BlockRecord {
   initatorUuid?: string;
-  responderUuid?: string;
+  receiverUuid?: string;
   createdAtUtc?: Date;
   updatedAtUtc?: Date;
   deletedAtUtc?: Date;

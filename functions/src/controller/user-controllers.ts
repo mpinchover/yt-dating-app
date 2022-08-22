@@ -1,30 +1,42 @@
 import { UserEntity, DatingMatchPreferencesEntity } from "../types/user";
+import { VideoRecord } from "../types/video";
+import { BlockRecord } from "../types/match";
 import { Repo } from "../database/repo";
 import { AWSGateway } from "../gateway/aws";
+import { YoutubeGateway } from "../gateway/youtube";
+import { FirebaseController } from "../controller/firebase-controller";
 import { userEntityToRecord } from "../utils/mapper-user";
+import { videoGatewayToRecord } from "../utils/mapper-video";
 import { v4 as uuidv4 } from "uuid";
 import { LikeRecord, MatchRecord } from "../types/match";
+import { TrackedVideoRecord } from "../types/video";
 
 export interface UserControllerParams {
   // db: any;
   repo: Repo;
-
   awsGateway: AWSGateway;
+  youtubeGateway: YoutubeGateway;
+  firebaseController: FirebaseController;
 }
 
 export class UserController {
   repo: Repo;
   awsGateway: AWSGateway;
+  youtubeGateway: YoutubeGateway;
+  firebaseController: FirebaseController;
 
   constructor(p: UserControllerParams) {
     this.repo = p.repo;
     this.awsGateway = p.awsGateway;
+    this.youtubeGateway = p.youtubeGateway;
+    this.firebaseController = p.firebaseController;
   }
 
   /*
   1) create user
   2) get email/text to create a password
   3) run validation in handler
+  // firebase may take care of this for you?
 
   */
   createUser = async (params: createUserParams) => {
@@ -49,12 +61,114 @@ export class UserController {
     await this.repo.deleteUser(params.uuid);
   };
 
-  // pass in maybe some enum and map the enum to what you're updating
   updateUser = async (params: updateUserParams) => {
-    params.updates.forEach((update) => {
-      if (update.updateType == userUpdateType.UPDATE_ACCOUNT_SETTINGS) {
+    params.updates.forEach(async (update) => {
+      // firebase
+      if (update.updateType === userUpdateType.UPDATE_EMAIL) {
+        const id = await this.repo.getUserIdByUuid(params.userUuid);
+        const updateParams = {
+          userId: id,
+          email: update.email,
+        };
+
+        await this.firebaseController.updateEmail(updateParams);
+      }
+      if (update.updateType === userUpdateType.UPDATE_MOBILE) {
+        const id = await this.repo.getUserIdByUuid(params.userUuid);
+        const updateParams = {
+          userId: id,
+          mobile: update.mobile,
+        };
+
+        await this.firebaseController.updateMobile(updateParams);
+      }
+      if (update.updateType === userUpdateType.UPDATE_PASSWORD) {
+        const id = await this.repo.getUserIdByUuid(params.userUuid);
+        const updateParams = {
+          userId: id,
+          password: update.newPassword,
+          confirmPassowrd: update.newPasswordConfirm,
+        };
+
+        await this.firebaseController.updatePassword(updateParams);
+      }
+
+      // dating pref
+      if (update.updateType === userUpdateType.UPDATE_MAX_AGE) {
+      }
+
+      if (update.updateType === userUpdateType.UPDATE_MIN_AGE) {
+      }
+
+      if (update.updateType === userUpdateType.UPDATE_GENDER_PREFERENCE) {
+      }
+
+      // youtube
+      if (update.updateType === userUpdateType.ADD_YOUTUBE_LINKS) {
+      }
+
+      if (update.updateType === userUpdateType.SWAP_YOUTUBE_LINKS) {
+      }
+
+      // pictures
+      if (update.updateType === userUpdateType.ADD_PICTURES) {
+      }
+
+      if (update.updateType === userUpdateType.UPDATE_PICTURE_ORDER) {
       }
     });
+  };
+
+  createVideoAndTrackedVideo = async (params: addMediaLinkParams) => {
+    let videoRecord: VideoRecord = await this.repo.getVideoById(params.mediaId);
+    // if the video record exists, just create the treacked video record
+    if (videoRecord) {
+      const trackedVideoRecord: TrackedVideoRecord = {
+        videoUuid: videoRecord.uuid,
+        userUuid: params.userUuid,
+      };
+      await this.repo.createTrackedVideoRecord(trackedVideoRecord);
+      return;
+    }
+
+    const videoDetails = await this.youtubeGateway.getYoutubeDetailsByVideoId(
+      params.mediaId
+    );
+    videoRecord = videoGatewayToRecord(videoDetails);
+    videoRecord.uuid = uuidv4();
+
+    const trackedVideoRecord: TrackedVideoRecord = {
+      videoUuid: videoRecord.uuid,
+      userUuid: params.userUuid,
+    };
+    // create video record and tracked video record in tx
+    await this.repo.createVideoAndTrackedVideoRecords(
+      videoRecord,
+      trackedVideoRecord
+    );
+  };
+
+  // always have at least 5 media links
+  swapVideos = async (params: swapVideosParams) => {
+    // first check to see if the video exists
+    let newVideo = await this.repo.getVideoById(params.incomingVideoId);
+    if (!newVideo) {
+      // if the video doesnt exist, create the uuid for it
+      // create the video
+      const videoDetails = await this.youtubeGateway.getYoutubeDetailsByVideoId(
+        params.incomingVideoId
+      );
+      newVideo = videoGatewayToRecord(videoDetails);
+      newVideo.uuid = uuidv4();
+
+      await this.repo.createVideo(newVideo);
+    }
+
+    await this.repo.swapVideos(
+      params.userUuid,
+      newVideo.uuid,
+      params.videoToBeReplacedUuid
+    );
   };
 
   likeProfile = async (params: likeProfileParams) => {
@@ -102,7 +216,14 @@ export class UserController {
     return await this.repo.getProfileByUserUUID(params.uuid);
   };
 
-  blockProfileByUUID = async () => {};
+  blockProfileByUuid = async (params: blockProfileByUuidParams) => {
+    const block: BlockRecord = {
+      initatorUuid: params.userBlockingUuid,
+      receiverUuid: params.userBeingBlockedUuid,
+      blockedUserUuids: [params.userBeingBlockedUuid, params.userBlockingUuid],
+    };
+    await this.repo.createBlockRecord(block);
+  };
 
   //   getDatingPreferencesByUuid = async (
   //     uuid: string
@@ -143,12 +264,16 @@ interface getProfileByUUIDParams {
 }
 
 enum userUpdateType {
-  UPDATE_ACCOUNT_SETTINGS, // pass, email, mobile
-  UPDATE_DATING_PREFERENCES,
-  UPDATE_MEDIA_LINKS, // youtube links
-  UPDATE_PICTURE_ORDER, // pics, other stuff
-  ADD_PICTURE,
-  DELETE_PICTURE,
+  UPDATE_PASSWORD,
+  UPDATE_EMAIL,
+  UPDATE_MOBILE,
+  UPDATE_MAX_AGE,
+  UPDATE_MIN_AGE,
+  UPDATE_GENDER_PREFERENCE,
+  ADD_YOUTUBE_LINKS,
+  SWAP_YOUTUBE_LINKS,
+  ADD_PICTURES, // requireq 6 pics min or something
+  UPDATE_PICTURE_ORDER,
 }
 
 interface updateUserParam {
@@ -163,10 +288,33 @@ interface updateUserParam {
 }
 
 interface updateUserParams {
+  userUuid: string;
   updates: updateUserParam[];
 }
 
 interface likeProfileParams {
   initiatorUuid: string;
   likedProfileUuid: string;
+}
+
+interface addMediaLinkParams {
+  userUuid: string;
+  mediaId: string;
+}
+
+interface blockProfileByUuidParams {
+  userBlockingUuid: string;
+  userBeingBlockedUuid: string;
+}
+
+interface deleteMediaLinkParams {
+  userUuid: string;
+  incomingMediaId: string;
+  mediaToBeReplacedId: string;
+}
+
+interface swapVideosParams {
+  userUuid: string;
+  incomingVideoId: string; // the youtube ID
+  videoToBeReplacedUuid: string;
 }
