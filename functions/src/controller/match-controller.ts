@@ -4,7 +4,7 @@ import {
   UserProfileSearchFilterRecord,
 } from "../types/match";
 import { VideoEntity } from "../types/video";
-import { Repo } from "../database/repo";
+import { Repo } from "../repository/repo";
 import levenshtein from "fast-levenshtein";
 import { userRecordConstructor } from "firebase-functions/v1/auth";
 
@@ -394,7 +394,7 @@ class MatchController {
     const regex = /[^A-Za-z0-9]/g;
 
     for (let w of text) {
-      if (w.length > 3) {
+      if (!wordsSet.has(w)) {
         w.replace(regex, "");
         sanitizedWords.push(w);
       }
@@ -403,3 +403,14 @@ class MatchController {
     return sanitizedWords.join(" ");
   };
 }
+
+const wordsSet = new Set([
+  "and",
+  "the",
+  "a",
+  "that",
+  "this",
+  "it",
+  "in",
+  "for",
+]);

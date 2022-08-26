@@ -1,37 +1,40 @@
 import { UserEntity, DatingMatchPreferencesEntity } from "../types/user";
 import { VideoRecord } from "../types/video";
 import { BlockRecord } from "../types/match";
-import { Repo } from "../database/repo";
+import { Repo } from "../repository/repo";
 import { AWSGateway } from "../gateway/aws";
 import { YoutubeGateway } from "../gateway/youtube";
-import { FirebaseController } from "../controller/firebase-controller";
+import { FirebaseController } from "./firebase-controller";
 import { userEntityToRecord } from "../utils/mapper-user";
 import { videoGatewayToRecord } from "../utils/mapper-video";
 import { v4 as uuidv4 } from "uuid";
 import { LikeRecord, MatchRecord } from "../types/match";
 import { TrackedVideoRecord } from "../types/video";
+import { injectable, container } from "tsyringe";
+import "reflect-metadata";
 
 export interface UserControllerParams {
-  // db: any;
   repo: Repo;
   awsGateway: AWSGateway;
   youtubeGateway: YoutubeGateway;
   firebaseController: FirebaseController;
 }
 
+@injectable()
 export class UserController {
   repo: Repo;
   awsGateway: AWSGateway;
   youtubeGateway: YoutubeGateway;
   firebaseController: FirebaseController;
+  name: string;
 
-  constructor(p: UserControllerParams) {
-    this.repo = p.repo;
-    this.awsGateway = p.awsGateway;
-    this.youtubeGateway = p.youtubeGateway;
-    this.firebaseController = p.firebaseController;
+  constructor() {
+    this.name = "hello";
+    this.repo = container.resolve(Repo);
+    this.awsGateway = container.resolve(AWSGateway);
+    this.youtubeGateway = container.resolve(YoutubeGateway);
+    this.firebaseController = container.resolve(FirebaseController);
   }
-
   /*
   1) create user
   2) get email/text to create a password
@@ -87,7 +90,7 @@ export class UserController {
         const updateParams = {
           userId: id,
           password: update.newPassword,
-          confirmPassowrd: update.newPasswordConfirm,
+          confirmPassword: update.newPasswordConfirm,
         };
 
         await this.firebaseController.updatePassword(updateParams);
@@ -225,29 +228,9 @@ export class UserController {
     await this.repo.createBlockRecord(block);
   };
 
-  //   getDatingPreferencesByUuid = async (
-  //     uuid: string
-  //   ): Promise<DatingMatchPreferencesEntity> => {
-  //     const datingMatchPreferencesSnapshot = await this.db
-  //       .collection("dating_match_preferences")
-  //       .where("userUUID", "==", uuid)
-  //       .get();
-
-  //     const prefs: DatingMatchPreferencesEntity = {};
-  //     if (datingMatchPreferencesSnapshot.length > 0) {
-  //       const data = datingMatchPreferencesSnapshot[0].data();
-  //       prefs.uuid = data.uuid;
-  //       prefs.userUuid = data.userUuid;
-  //       prefs.genderPreference = data.genderPreference;
-  //       prefs.gender = data.gender;
-  //       prefs.age = data.age;
-  //       prefs.ageMinPreference = data.ageMinPreference;
-  //       prefs.ageMaxPreference = data.ageMaxPreference;
-  //       prefs.zipcode = data.zipcode;
-  //       prefs.zipcodePreference = data.zipcodePreference;
-  //     }
-  //     return prefs;
-  //   };
+  testUserRepoFn = () => {
+    return "test-works";
+  };
 }
 
 interface deleteUserParams {
@@ -272,7 +255,7 @@ enum userUpdateType {
   UPDATE_GENDER_PREFERENCE,
   ADD_YOUTUBE_LINKS,
   SWAP_YOUTUBE_LINKS,
-  ADD_PICTURES, // requireq 6 pics min or something
+  ADD_PICTURES, // min 6 pics required
   UPDATE_PICTURE_ORDER,
 }
 
@@ -284,7 +267,6 @@ interface updateUserParam {
   newPasswordConfirm: string;
   newEmail: string;
   newMobile: string; // need new confirmation
-  //  newPics:
 }
 
 interface updateUserParams {

@@ -1,23 +1,14 @@
 import * as AWS from "aws-sdk";
 import { v4 as uuidv4 } from "uuid";
+import { injectable } from "tsyringe";
 export interface AWSGatewayParams {
   s3: any;
 }
 
-// const s3 = new AWS.S3({
-//   accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID,
-//   secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
-// });
-
+@injectable()
 export class AWSGateway {
   s3: any;
-  constructor(p: AWSGatewayParams) {
-    // this.s3 = new AWS.S3({
-    //   accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID,
-    //   secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
-    // });
-    this.s3 = p.s3;
-  }
+  constructor() {}
 
   buildS3ImageUploadObject = (params: uploadPictureToAWSParams) => {
     const { userUuid, bufferBase64 } = params;

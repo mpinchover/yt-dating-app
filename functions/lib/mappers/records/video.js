@@ -1,3 +1,8 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+/*
+convert a youtube video responde to record youtube video
+*/
 exports.fromGatewayToRecordYoutubeVideo = (data) => {
     try {
         if (data.length < 1) {
@@ -12,18 +17,17 @@ exports.fromGatewayToRecordYoutubeVideo = (data) => {
             resp.description = youtubeVideoResponse.snippet.description;
             resp.categoryId = youtubeVideoResponse.snippet.categoryId;
         }
-        const topicCategories = [];
+        resp.topicCategories = [];
         if (youtubeVideoResponse.topicDetails &&
             youtubeVideoResponse.topicDetails.topicCategories) {
             youtubeVideoResponse.topicDetails.topicCategories.forEach((c) => {
                 const n = c.lastIndexOf("/");
                 const category = c.substring(n + 1);
                 if (category.length > 0) {
-                    topicCategories.push(category);
+                    resp.topicCategories.push(category);
                 }
             });
         }
-        resp.topicCategories = topicCategories;
         return resp;
     }
     catch (e) {

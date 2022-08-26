@@ -13,28 +13,22 @@ import {
 import { datingMatchPrefRecordToEntity } from "../utils/mapper-user";
 import { videoFirestoreToRecord } from "../utils/mapper-video";
 import { VideoEntity, VideoRecord, TrackedVideoRecord } from "../types/video";
-const functions = require("firebase-functions");
+import { injectable } from "tsyringe";
+import { container } from "tsyringe";
+const fns = require("firebase-functions");
 const admin = require("firebase-admin");
-admin.initializeApp(functions.config().firebase);
-
-const Firestore = require("@google-cloud/firestore");
-// Use your project ID here
-const PROJECTID = "dating-app-622c1";
 
 export interface RepoParams {
   db: any;
 }
 
-// interface RepoFunctions {
-//   getLikeRecord: (initiator: string, receiver: string) => Promise<LikeRecord>;
-// }
-
+@injectable()
+// you can just set the db value in the testing code
+// not a big deal
 export class Repo {
   db: any;
 
-  constructor(p: RepoParams) {
-    this.db = p.db;
-  }
+  constructor() {}
 
   createMatchRecord = async (params: MatchRecord) => {
     this.db.collection("matches").add(params);
@@ -42,7 +36,7 @@ export class Repo {
 
   getUserUuidsMatchedToUuid = async (uuid: string): Promise<string[]> => {
     const ids = new Set<string>();
-    var db = admin.firestore();
+    // var db = admin.firestore();
     let usersSnapshot = await this.db
       .collection("match")
       .where("matchedUsersUUIDs", "array-contains", uuid)
@@ -50,7 +44,6 @@ export class Repo {
 
     const results = new Set<string>();
     usersSnapshot.forEach((doc) => {
-      // console.log(doc.id, '=>', doc.data());
       const matchedUserUUIDs = doc
         .data()
         .matchedUsersUUIDs.filter((matchedUserUUID) => matchedUserUUID != uuid);
@@ -110,7 +103,6 @@ export class Repo {
     const results = new Set<string>();
 
     usersSnapshot.forEach((doc) => {
-      // console.log(doc.id, '=>', doc.data());
       const blockedUUIDs = doc
         .data()
         .blockedUserUUIDs.filter((blockedUUID) => blockedUUID != uuid);
@@ -425,15 +417,7 @@ export class Repo {
 
 // // https://firebase.google.com/docs/firestore/query-data/get-data#node.js
 
-export const getUsersByUuids = async (userUuids: string[]) => {
-  var db = admin.firestore();
-  const usersSnapshot = await db
-    .collection("users")
-    .where("user_uuid", "in", [userUuids])
-    .get();
-  return usersSnapshot;
-};
+/*
+https://levelup.gitconnected.com/dependency-injection-in-typescript-2f66912d143c
 
-export const testAdd = (a: number, b: number): number => {
-  return a + b;
-};
+*/

@@ -25,7 +25,10 @@
     "chai": "^4.3.6",
     "firebase-admin": "^9.8.0",
     "firebase-functions": "^3.14.1",
+    "reflect-metadata": "^0.1.13",
     "sinon": "^14.0.0",
+    "tsyringe": "^4.7.0",
+    "typedi": "^0.10.0",
     "uuid": "^8.3.2"
   },
   "devDependencies": {

@@ -1,12 +1,13 @@
+import { injectable } from "tsyringe";
+
 export interface FirebaseControllerParams {
   auth: any;
 }
 
+@injectable()
 export class FirebaseController {
   auth: any;
-  constructor(p: FirebaseControllerParams) {
-    this.auth = p.auth;
-  }
+  constructor() {}
 
   updatePassword = async (params: updatePasswordParams) => {
     const { userId, password, confirmPassword } = params;
