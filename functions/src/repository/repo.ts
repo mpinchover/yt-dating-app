@@ -2,166 +2,206 @@ import {
   DatingMatchPreferencesEntity,
   UserEntity,
   UserRecord,
+  DatingMatchPreferencesRecord,
 } from "../types/user";
 import {
   MatchRecord,
   BlockRecord,
-  // DatingPreferencesFilterEntity,
   UserProfileSearchFilterRecord,
   LikeRecord,
 } from "../types/match";
 import { datingMatchPrefRecordToEntity } from "../utils/mapper-user";
 import { videoFirestoreToRecord } from "../utils/mapper-video";
 import { VideoEntity, VideoRecord, TrackedVideoRecord } from "../types/video";
-import { injectable } from "tsyringe";
+import { injectable, singleton } from "tsyringe";
 import { container } from "tsyringe";
-const fns = require("firebase-functions");
-const admin = require("firebase-admin");
+const MongoClient = require("mongodb").MongoClient;
+import "reflect-metadata";
 
 export interface RepoParams {
   db: any;
 }
 
-@injectable()
-// you can just set the db value in the testing code
-// not a big deal
+@singleton()
 export class Repo {
-  db: any;
+  public db: any;
+  public client: any;
 
-  constructor() {}
+  constructor() {
+    // this.setupMongoConnection();
+  }
 
+  setupMongoConnection = async () => {
+    try {
+      const uri = "mongodb://127.0.0.1:27020/youtube-dating-app";
+      const client = await MongoClient.connect(uri);
+      this.client = client;
+      this.db = this.client.db;
+      console.log("sucesfully connected to db");
+    } catch (e) {
+      console.log("failed to connect to db");
+      console.log(e);
+      throw e;
+    }
+  };
+
+  testAdd = (a, b) => {
+    return a + b;
+  };
+
+  // http://mongodb.github.io/node-mongodb-native/3.6/api/Cursor.html
   createMatchRecord = async (params: MatchRecord) => {
-    this.db.collection("matches").add(params);
+    await this.db.collection("matches").insertOne(params);
   };
 
-  getUserUuidsMatchedToUuid = async (uuid: string): Promise<string[]> => {
-    const ids = new Set<string>();
-    // var db = admin.firestore();
-    let usersSnapshot = await this.db
-      .collection("match")
-      .where("matchedUsersUUIDs", "array-contains", uuid)
-      .get();
-
-    const results = new Set<string>();
-    usersSnapshot.forEach((doc) => {
-      const matchedUserUUIDs = doc
-        .data()
-        .matchedUsersUUIDs.filter((matchedUserUUID) => matchedUserUUID != uuid);
-      matchedUserUUIDs.forEach((item) => results.add(item));
-    });
-    return Array.from(results);
-  };
-
+  /*
+    get a match for both of these uuids if any exists
+  */
   // make sure to check by status and not deleted
   getMatchRecordByUuids = async (
     uuid1: string,
     uuid2: string
   ): Promise<MatchRecord> => {
-    const matchSnapshot = this.db
+    const matchRecord: MatchRecord = await this.db
       .collection("matches")
-      .where("matchedUsersUuids", "array-contains", [uuid1, uuid2])
-      .get();
-    return null;
+      .findOne({
+        deletedAtUtc: null,
+        $or: [
+          {
+            $and: [{ initiatorUuid: uuid1 }, { responderUuid: uuid2 }],
+          },
+          {
+            $and: [{ initiatorUuid: uuid2 }, { responderUuid: uuid1 }],
+          },
+        ],
+      });
+    return matchRecord;
+  };
+
+  getMatchRecordByUuid = async (uuid: string): Promise<MatchRecord> => {
+    return await this.db
+      .collection("matches")
+      .findOne({ uuid, deletedAtUtc: null });
+  };
+
+  deleteMatchRecord = async (uuid: string) => {
+    const user: MatchRecord = await this.getMatchRecordByUuid(uuid);
+
+    if (!user) throw new Error("match does not exist");
+    await this.db.collection("matches").updateOne(
+      {
+        uuid,
+      },
+      { $set: { deletedAtUtc: new Date().getTime() } }
+    );
+  };
+
+  /*
+    get users matched to this uuid
+  */
+  getUserUuidsMatchedToUuid = async (uuid: string): Promise<string[]> => {
+    let results = new Set<string>();
+    const cursor = await this.db.collection("matches").find({
+      $or: [{ responderUuid: uuid }, { initiatorUuid: uuid }],
+    });
+
+    await cursor.forEach((doc) => {
+      const { initiatorUuid, responderUuid } = doc;
+
+      if (initiatorUuid !== uuid) results.add(initiatorUuid);
+      else results.add(responderUuid);
+    });
+
+    return Array.from(results);
   };
 
   createBlockRecord = async (blockRecord: BlockRecord) => {
-    await this.db.collection("blocks").add(blockRecord);
+    await this.db.collection("blocks").insertOne(blockRecord);
   };
 
+  /*
+    get all the blocked records where uuid1 blocked uuid2 or other way around
+  */
   // make sure to set delted_at = null
   getBlockedByUserUuids = async (
     uuid1: string,
     uuid2: string
   ): Promise<BlockRecord> => {
-    let usersSnapshot = await this.db
-      .collection("block")
-      .where("blockedUserUuids", "array-contains", [uuid1, uuid2])
-      .get();
-
-    if (usersSnapshot.length > 0) {
-      const data = usersSnapshot[0].data();
-      const record: BlockRecord = {
-        initatorUuid: data.initatorUuid,
-        receiverUuid: data.receiverUuid,
-        createdAtUtc: data.createdAtUtc,
-        deletedAtUtc: data.deletedAtUtc,
-        blockedUserUuids: data.blockedUserUUIDs,
-      };
-      return record;
-    }
-    return null;
+    const blockedRecord: BlockRecord = await this.db
+      .collection("blocks")
+      .findOne({
+        deletedAtUtc: null,
+        $or: [
+          {
+            $and: [{ initiatorUuid: uuid1 }, { receiverUuid: uuid2 }],
+          },
+          {
+            $and: [{ initiatorUuid: uuid2 }, { receiverUuid: uuid1 }],
+          },
+        ],
+      });
+    return blockedRecord;
   };
 
   getUsersWhoBlockedThisUuid = async (uuid: string): Promise<string[]> => {
-    const ids = new Set<string>();
-
-    let usersSnapshot = await this.db
-      .collection("blocks")
-      .where("blockedUserUuids", "array-contains", uuid)
-      .get();
-
     const results = new Set<string>();
-
-    usersSnapshot.forEach((doc) => {
-      const blockedUUIDs = doc
-        .data()
-        .blockedUserUUIDs.filter((blockedUUID) => blockedUUID != uuid);
-      blockedUUIDs.forEach((item) => results.add(item));
+    const cursor = await this.db.collection("blocks").find({
+      receiverUuid: uuid,
+    });
+    await cursor.forEach((doc) => {
+      const { initiatorUuid, receiverUuid } = doc;
+      if (initiatorUuid !== uuid) results.add(initiatorUuid);
+      else results.add(receiverUuid);
     });
     return Array.from(results);
   };
 
   createLikeRecord = async (params: LikeRecord) => {
-    const res = await this.db.collection("likes").add(params);
+    await this.db.collection("likes").insertOne(params);
   };
 
+  // https://hevodata.com/learn/mongodb-transactions-on-nodejs/
   createLikeAndMatchRecords = async (
     likeParams: LikeRecord,
     matchParams: MatchRecord
   ) => {
-    await this.db.runTransaction(async (t) => {
-      await t.collection("likes").add(likeParams);
-      await t.collection("matches").add(matchParams);
-    });
+    const session = this.client.startSession();
+    await this.db.collection("likes").insertOne(likeParams, { session });
+    await this.db.collection("matches").insertOne(matchParams, { session });
+
+    // await session.withTransaction(async () => {
+    //   await this.db.collection("likes").insertOne(likeParams, { session });
+    //   await this.db.collection("matches").insertOne(matchParams, { session });
+    // });
+    // await session.endSession();
   };
 
   createTrackedVideoRecord = async (trackedVideoRecord: TrackedVideoRecord) => {
-    await this.db.collection("tracked_videos").add(trackedVideoRecord);
+    await this.db.collection("tracked_videos").insertOne(trackedVideoRecord);
   };
 
-  getVideoById = async (videoId: string): Promise<VideoRecord> => {
-    let videoSnapshot = await this.db
+  getVideoByVideoId = async (videoId: string): Promise<VideoRecord> => {
+    const video: VideoRecord = await this.db
       .collection("videos")
-      .where("videoId", "==", videoId)
-      .get();
-
-    if (videoSnapshot.length == 0) return null;
-
-    const data = videoSnapshot[0].data();
-    const videoRecord: VideoRecord = {
-      uuid: data.uuid,
-      videoId: data.videoId,
-      channelId: data.channelId,
-      videoTitle: data.videoTitle,
-      description: data.description,
-      categoryId: data.categoryId,
-      topicCategories: data.topicCategories,
-    };
-    return videoRecord;
+      .findOne({ videoId: videoId, deletedAtUtc: null });
+    return video;
   };
 
   createVideoAndTrackedVideoRecords = async (
     videoRecord: VideoRecord,
     trackedVideoRecord: TrackedVideoRecord
   ) => {
-    await this.db.runTransaction(async (t) => {
-      await t.collection("likes").add(videoRecord);
-      await t.collection("matches").add(trackedVideoRecord);
-    });
-  };
+    await this.createVideo(videoRecord);
+    await this.createTrackedVideoRecord(trackedVideoRecord);
 
-  getUserIdByUuid = async (uuid: string): Promise<string> => {
-    return await this.db.collection("users").where("uuid", "==", uuid).get();
+    //  const session = this.client.startSession();
+    // await session.withTransaction(async () => {
+    //   await this.db.collection("videos").insertOne(videoRecord, { session });
+    //   await this.db
+    //     .collection("tracked_video_records")
+    //     .insertOne(trackedVideoRecord, { session });
+    // });
+    // await session.endSession();
   };
 
   // set the tracked video's deleted to now
@@ -170,21 +210,32 @@ export class Repo {
     const video = await this.getVideoByUuid(videoUuid);
     const trackedVideo = await this.getTrackedVideoByVideoUuid(video.uuid);
 
-    await this.db.runTransaction(async (t) => {
-      await this.db.collection("videos").doc(video.id).update({
-        deletedAt: curTime,
-      });
+    // re-enable transactions
+    // const session = this.client.startSession();
+    // await session.withTransaction(async () => {
+    await this.db.collection("videos").updateOne(
+      {
+        uuid: videoUuid,
+      },
 
-      await this.db.collection("videos").doc(trackedVideo.id).update({
-        deletedAt: curTime,
-      });
-    });
+      { $set: { deletedAtUtc: curTime } }
+      // { session }
+    );
+
+    await this.db.collection("tracked_videos").updateOne(
+      {
+        videoUuid,
+      },
+      { $set: { deletedAtUtc: curTime } }
+      // { session }
+    );
+    // });
 
     return null;
   };
 
   createVideo = async (videoRecord: VideoRecord) => {
-    await this.db.collection("videos").add(videoRecord);
+    await this.db.collection("videos").insertOne(videoRecord);
   };
 
   // run in transaction to update the trackedRecord
@@ -192,6 +243,7 @@ export class Repo {
   // swap will be once we have 5 youtueb videos, a user must swap videos if
   // they want to rchange one. Can't just delete
   swapVideos = async (
+    newTrackedVideoRecordUuid: string,
     userUuid: string,
     incomingVideoUuid: string,
     videoToReplaceUuid: string
@@ -201,124 +253,117 @@ export class Repo {
     const existingTrackedRecord = await this.getTrackedVideoByVideoUuid(
       videoToReplaceUuid
     );
-    await this.db.runTransaction(async (t) => {
-      await t
-        .collections("tracked_videos")
-        .doc(existingTrackedRecord.id)
-        .update({
-          deletedAt: new Date().getTime(),
-        });
+    if (!existingTrackedRecord)
+      throw new Error("existing tracked video not found");
+    const deletedAtUtc = new Date().getTime();
+    await this.db.collection("tracked_videos").updateOne(
+      {
+        uuid: existingTrackedRecord.uuid,
+      },
+      { $set: { deletedAtUtc } }
+    );
+    const newTrackedRecord: TrackedVideoRecord = {
+      userUuid: userUuid,
+      videoUuid: incomingVideoUuid,
+      uuid: newTrackedVideoRecordUuid,
+    };
+    await this.db.collection("tracked_videos").insertOne(newTrackedRecord);
+    // re-enable transactions
+    // const session = this.client.startSession();
+    // await session.withTransaction(async () => {
+    //   const deletedAtUtc = new Date().getTime();
+    //   await this.db.collection("tracked_videos").updateOne(
+    //     {
+    //       uuid: existingTrackedRecord.uuid,
+    //     },
+    //     { $set: { deletedAtUtc } },
+    //     { session }
+    //   );
 
-      const newTrackedRecord: TrackedVideoRecord = {
-        userUuid: userUuid,
-        videoUuid: incomingVideoUuid,
-      };
-      await t.collections("tracked_videos").add(newTrackedRecord);
-    });
+    //   const newTrackedRecord: TrackedVideoRecord = {
+    //     userUuid: userUuid,
+    //     videoUuid: incomingVideoUuid,
+    //     uuid: newTrackedVideoRecordUuid,
+    //   };
+    //   await this.db
+    //     .collections("tracked_videos")
+    //     .insertOne(newTrackedRecord, { session });
+    // });
   };
 
   getLikeRecord = async (
-    initiator: string,
-    receiver: string
+    initiatorUuid: string,
+    receiverUuid: string
   ): Promise<LikeRecord> => {
-    let likeSnapshot = await this.db
-      .collection("likes")
-      .where("initiator", "==", initiator)
-      .where("receiver", "==", receiver)
-      .get();
-
-    if (likeSnapshot.length > 0) {
-      const data = likeSnapshot[0].data();
-      const like: LikeRecord = {
-        createdAtUtc: data.createdAtUtc,
-        updatedAtUtc: data.updatedAtUtc,
-        deletedAtUtc: data.updatedAtUtc,
-        initiatorUuid: data.initiatorUuid,
-        receiverUuid: data.receiverUuid,
-      };
-      return like;
-    }
-    return null;
-  };
-
-  createUser = async (params: UserRecord) => {
-    await this.db.collection("users").add(params);
-  };
-
-  deleteUser = async (uuid: string) => {
-    const snapshot = await this.db
-      .collection("users")
-      .where("uuid", "==", uuid)
-      .get();
-
-    const docID = snapshot[0].id;
-    await this.db.collection("users").doc(docID).update({
-      deletedAt: new Date().getTime(),
+    return await this.db.collection("likes").findOne({
+      initiatorUuid,
+      receiverUuid,
     });
   };
 
-  getProfileByUserUUID = async (uuid: string) => {
-    const snapshot = await this.db
-      .collection("users")
-      .where("uuid", "==", uuid)
-      .get();
-    return snapshot[0].data();
+  createUser = async (params: UserRecord) => {
+    await this.db.collection("users").insertOne(params);
   };
 
+  deleteUserByUuid = async (uuid: string) => {
+    const user: UserRecord = await this.getUserByUUID(uuid);
+
+    if (!user) throw new Error("user does not exist");
+    await this.db.collection("users").updateOne(
+      {
+        uuid,
+      },
+      { $set: { deletedAtUtc: new Date().getTime() } }
+    );
+  };
+
+  getUserByUUID = async (uuid: string): Promise<UserRecord> => {
+    const user: UserRecord = await this.db
+      .collection("users")
+      .findOne({ uuid, deletedAtUtc: null });
+    return user;
+  };
+
+  /*
+  get all tracked videos for a user uuid
+  */
   getTrackedVideosByUserUuids = async (
     userUuids: string[]
   ): Promise<TrackedVideoRecord[]> => {
-    const res = await this.db
+    const records: TrackedVideoRecord[] = [];
+    const cursor = await this.db
       .collection("tracked_videos")
-      .where("userUuid", "in", userUuids)
-      .Get();
-
-    return res;
+      .find({ userUuid: { $in: userUuids }, deletedAtUtc: null });
+    await cursor.forEach((doc) => {
+      records.push(doc);
+    });
+    return records;
   };
 
   getTrackedVideoByVideoUuid = async (
     videoUuid: string
   ): Promise<TrackedVideoRecord> => {
-    const snapshot = await this.db
+    const video = await this.db
       .collection("tracked_videos")
-      .where("videoUuid", "==", videoUuid)
-      .Get();
-    if (snapshot.length == 0) return null;
+      .findOne({ videoUuid: videoUuid, deletedAtUtc: null });
 
-    const res: TrackedVideoRecord = {
-      videoUuid: snapshot[0].data().videoUuid,
-      userUuid: snapshot[0].data().userUuid,
-      id: snapshot[0].data().id,
-    };
-    return res;
+    return video;
   };
 
   getVideoByUuid = async (uuid: string): Promise<VideoRecord> => {
-    const snapshot = await this.db
-      .collection("videos")
-      .where("uuid", "==", uuid)
-      .Get();
-    if (snapshot.length == 0) return null;
-    const data = snapshot[0].data();
-    data.id = snapshot[0].id;
-    const res = videoFirestoreToRecord(data);
-    return res;
+    return await this.db.collection("videos").findOne({ uuid });
   };
 
   getVideosByUuids = async (uuids: string[]): Promise<VideoRecord[]> => {
-    const videos: VideoRecord[] = [];
-    const snapshot = await this.db
+    const records: VideoRecord[] = [];
+    const cursor = await this.db
       .collection("videos")
-      .where("uuid", "in", uuids)
-      .Get();
-    snapshot.forEach((doc) => {
-      const vRecord = videoFirestoreToRecord(doc.data());
-      videos.push(vRecord);
-    });
-    return videos;
+      .find({ uuid: { $in: uuids } });
+    cursor.forEach((doc) => records.push(doc));
+    return records;
   };
 
-  getUserProfileEntities = async (
+  getUsersForMatching = async (
     filters: UserProfileSearchFilterRecord
   ): Promise<UserEntity[]> => {
     const users: UserEntity[] = [];
@@ -328,37 +373,37 @@ export class Repo {
       DatingMatchPreferencesEntity
     >();
     const userUuidToVideos = new Map<string, VideoEntity[]>();
+    const {
+      gender,
+      genderPreference,
+      ageMaxPreference,
+      ageMinPreference,
+      age,
+      userUuidsToFilterOut,
+    } = filters;
 
-    // var db = admin.firestore();
-    // get everyone that matches the dating preferences
-    const datingMatchPreferencesSnapshot = await this.db
-      .collection("dating_match_preferences")
-      .where("gender", "array-contains", filters.genderPreference)
-      .where("genderPreference", "==", filters.gender)
-      .where("age", "<=", filters.ageMaxPreference)
-      .where("age", ">=", filters.ageMinPreference)
-      .where("ageMinPreference", "<=", filters.age)
-      .where("ageMaxPreference", ">=", filters.age)
-      .where("userUUID", "not-in", filters.userUuidsToFilterOut)
-      .get();
+    let cursor = await this.db.collection("dating_match_preferences").find({
+      gender: genderPreference,
+      genderPreference: gender,
+      age: {
+        $and: [{ $lte: ageMaxPreference }, { $gte: ageMinPreference }],
+      },
+      ageMaxPreference: { $gte: age },
+      ageMinPreference: { $lte: age },
+      userUuid: { $nin: { userUuidsToFilterOut } },
+    });
 
-    datingMatchPreferencesSnapshot.forEach((doc) => {
-      const datingPrefEntity: DatingMatchPreferencesEntity =
-        datingMatchPrefRecordToEntity(doc.data());
-
+    cursor.forEach((datingPrefEntity: DatingMatchPreferencesEntity) => {
       userUuidToDatingPref.set(datingPrefEntity.userUuid, datingPrefEntity);
     });
 
     // now get their associated videos
-    // const videoUuids: string[] = [];
     const videoUuidToUserUuid = new Map<string, string>();
-
     const trackedVideoRecords = await this.getTrackedVideosByUserUuids(
       Array.from(userUuidToDatingPref.keys())
     );
 
     trackedVideoRecords.forEach((trackedVideo) => {
-      // videoUuids.push(trackedVideo.videoUuid);
       videoUuidToUserUuid.set(trackedVideo.videoUuid, trackedVideo.userUuid);
     });
 
@@ -366,58 +411,42 @@ export class Repo {
       Array.from(videoUuidToUserUuid.keys())
     );
 
-    // cycle through every video
-    // check what the user uuid is for this video
-    // map user uuid -> video
     videos.forEach((video) => {
       const userUuid = videoUuidToUserUuid.get(video.uuid);
       userUuidToVideos.get(userUuid).push(video);
     });
 
-    const usersSnapshot = await this.db
+    cursor = await this.db
       .collection("users")
-      .where("uuid", "in", Array.from(userUuidToVideos.keys()));
+      .find({ uuid: { $in: [Array.from(userUuidToVideos.keys())] } });
 
-    usersSnapshot.forEach((doc) => {
+    cursor.forEach((doc) => {
+      const { uuid } = doc;
       const userEntity: UserEntity = {
-        uuid: doc.data().uuid,
-        userDatingPreference: userUuidToDatingPref.get(doc.data().uuid),
-        videoEntities: userUuidToVideos.get(doc.data().uuid),
+        uuid,
+        userDatingPreference: userUuidToDatingPref.get(uuid),
+        videoEntities: userUuidToVideos.get(uuid),
       };
       users.push(userEntity);
     });
     return users;
   };
 
-  getDatingPreferencesByUuid = async (
+  getDatingPreferencesByUserUuid = async (
     uuid: string
   ): Promise<DatingMatchPreferencesEntity> => {
-    const datingMatchPreferencesSnapshot = await this.db
+    return await this.db
       .collection("dating_match_preferences")
-      .where("userUUID", "==", uuid)
-      .get();
+      .findOne({ userUuid: uuid, deletedAtUtc: null });
+  };
 
-    // handle by mapper
-    const prefs: DatingMatchPreferencesEntity = {};
-    if (datingMatchPreferencesSnapshot.length > 0) {
-      const data = datingMatchPreferencesSnapshot[0].data();
-      prefs.uuid = data.UUID;
-      prefs.userUuid = data.userUUID;
-      prefs.genderPreference = data.genderPreference;
-      prefs.gender = data.gender;
-      prefs.age = data.age;
-      prefs.ageMinPreference = data.ageMinPreference;
-      prefs.ageMaxPreference = data.ageMaxPreference;
-      prefs.zipcode = data.zipcode;
-      prefs.zipcodePreference = data.zipcodePreference;
-    }
-    return prefs;
+  createDatingPreferencesRecord = async (
+    params: DatingMatchPreferencesRecord
+  ) => {
+    await this.db.collection("dating_match_preferences").insertOne(params);
   };
 }
 
-// // https://firebase.google.com/docs/firestore/query-data/get-data#node.js
-
 /*
 https://levelup.gitconnected.com/dependency-injection-in-typescript-2f66912d143c
-
 */

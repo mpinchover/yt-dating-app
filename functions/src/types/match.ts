@@ -6,7 +6,7 @@ export interface MatchRecord {
   createdAtUtc?: Date;
   deletedAtUtc?: Date;
   updatedAtUtc?: Date;
-  matchedUsersUuids: string[]; // just for now until better db, bc query depends on it
+  // matchedUsersUuids: string[]; // just for now until better db, bc query depends on it
 }
 
 export interface UserMatchingItemEntity {
@@ -37,5 +37,5 @@ export interface BlockRecord {
   createdAtUtc?: Date;
   updatedAtUtc?: Date;
   deletedAtUtc?: Date;
-  blockedUserUuids: string[]; // just for now until better db, bc query depends on it
+ //  blockedUserUuids: string[]; // just for now until better db, bc query depends on it
 }

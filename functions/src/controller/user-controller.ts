@@ -229,7 +229,7 @@ export class UserController {
   };
 
   testUserRepoFn = () => {
-    return "test-works";
+    return "test-works..";
   };
 }
 

@@ -1,51 +1,129 @@
-const { testAdd } = require("../repo.ts");
-const { UserRepo } = require("../repo");
-const expect = require("chai").expect;
-var sinonChai = require("sinon-chai");
-const sinon = require("sinon");
-// const test = require("firebase-functions-test")();
-// const wrapped = test.wrap(testAdd);
+require("reflect-metadata");
 
-describe("testing the add function", () => {
-  it("addition worked correctly", (done) => {
-    const res = testAdd(4, 5);
-    expect(res).to.equal(9);
-    done();
+const { container } = require("tsyringe");
+const { Repo } = require("../repo");
+const { clearTables } = require("./utils");
+const MongoClient = require("mongodb").MongoClient;
+const expect = require("chai").expect;
+// var sinonChai = require("sinon-chai");
+// const sinon = require("sinon");
+
+describe("user test suite", () => {
+  let client;
+  let db;
+  const r = new Repo();
+
+  before(async () => {
+    try {
+      const uri = "mongodb://127.0.0.1:27020/youtube-dating-app";
+
+      client = await MongoClient.connect(uri);
+      db = client.db("youtube-dating-app");
+      r.client = db;
+      r.db = db;
+    } catch (e) {
+      console.log(e);
+    }
   });
 
-  it("getDatingPreferencesByUuid", (done) => {
-    const mockPreferences = {
-      prefs: "some-preferences",
-    };
+  beforeEach(async () => {
+    await clearTables(db);
+  });
 
-    const mockData = {
-      data: sinon.stub().returns(mockPreferences),
-      name: "MATT",
-    };
+  afterEach(async () => {
+    await clearTables(db);
+  });
 
-    const mockResults = [mockData];
-    const mockDB = {
-      collection: sinon.stub().returnsThis(),
-      where: sinon.stub().returnsThis(),
-      get: sinon.stub().resolves(mockResults),
-    };
+  after(() => {
+    client.close();
+  });
 
-    const userRepo = new UserRepo({ db: mockDB });
-    const res = userRepo.getDatingPreferencesByUuid("some-uuid");
+  beforeEach(async () => {});
 
-    sinon.assert.calledWithExactly(
-      mockDB.collection,
-      "dating_match_preferences"
-    );
-    sinon.assert.calledWithExactly(mockDB.where, "userUUID", "==", "some-uuid");
-    // sinon.assert.calledWithExactly(mockDB.doc, 'someDoc');
-    sinon.assert.calledOnce(mockDB.get);
-    // sinon.assert.calledOnce(mockData.data);
-    // sinon.assert.calledOnce(mockData.data);
+  /*
+    export interface UserRecord {
+      uuid?: string;
+      mobile?: string;
+      email?: string;
+      verified?: boolean;
+      lastSeenAtUtc?: Date;
+      deletedAtUtc?: Date;
+    }
+  */
+  it("create a user succesfully", async () => {
+    try {
+      const lastSeen = new Date().getTime();
+      const deletedAt = new Date().getTime();
 
-    done();
+      const user = {
+        _id: "some-id",
+        uuid: "some-uuid",
+        email: "some-email",
+        verified: false,
+        lastSeenAtUtc: lastSeen,
+
+        deletedAtUtc: null,
+      };
+      await r.createUser(user); // create the user
+      let insertedUser = await r.getUserByUUID(user.uuid);
+      expect(user).to.eql(insertedUser);
+      await r.deleteUserByUuid(user.uuid); // delete user
+      insertedUser = await r.getUserByUUID(user.uuid); // test deleted user
+      expect(null).to.eql(insertedUser);
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
   });
 });
 
-// error case
-// https://stackoverflow.com/questions/66868604/how-to-mock-firestore-with-mocha
+describe("dating prefs testing suite", () => {
+  let client;
+  let db;
+  const r = new Repo();
+
+  before(async () => {
+    try {
+      const uri = "mongodb://127.0.0.1:27020/youtube-dating-app";
+
+      client = await MongoClient.connect(uri);
+      db = client.db("youtube-dating-app");
+      r.client = db;
+      r.db = db;
+    } catch (e) {
+      console.log(e);
+    }
+  });
+
+  beforeEach(async () => {
+    await clearTables(db);
+  });
+
+  afterEach(async () => {
+    await clearTables(db);
+  });
+
+  after(() => {
+    client.close();
+  });
+
+  it("create dating preferences", async () => {
+    const params = {
+      _id: 0,
+      uuid: "some-uuid",
+      userUuid: "some-user-uuid",
+      genderPreference: "MALE",
+      gender: "FEMALE",
+      ageMinPreference: 10,
+      ageMaxPreference: 12,
+      zipcode: "0203",
+      zipcodePreference: "0293",
+    };
+
+    await r.createDatingPreferencesRecord(params);
+    const insertedRecord = await r.getDatingPreferencesByUserUuid(
+      params.userUuid
+    );
+    expect(params).to.eql(insertedRecord);
+  });
+});

@@ -26,6 +26,7 @@ export interface VideoEntity {
 }
 
 export interface TrackedVideoRecord {
+  uuid?: string;
   videoUuid?: string;
   userUuid?: string;
   id?: string;
@@ -33,6 +34,7 @@ export interface TrackedVideoRecord {
 }
 
 export interface TrackedVideoEntity {
+  uuid?: string;
   videoUuid?: string;
   userUuid?: string;
 }

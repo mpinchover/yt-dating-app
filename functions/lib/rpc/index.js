@@ -25,7 +25,6 @@ Handler = __decorate([
     __metadata("design:paramtypes", [])
 ], Handler);
 // https://github.com/microsoft/tsyringe
-// just use this
 exports.getDetailsByVideoID = functions.https.onRequest(async (request, response) => {
     try {
         const data = await youtubeController.getYoutubeVideoByID();
