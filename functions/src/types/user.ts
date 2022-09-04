@@ -5,35 +5,33 @@ user {
 
 */
 
-import { VideoEntity } from "./video";
-
-export enum Gender {
-  GENDER_MALE,
-  GENDER_FEMALE,
-  GENDER_X,
-  GENDER_MALE_FEMALE,
-  GENDER_MALE_X,
-  GENDER_FEMALE_X,
-  GENDER_MALE_FEMALE_X,
-}
+import { VideoEntity, VideoRecord } from "./video";
 
 export interface DatingMatchPreferencesRecord {
+  deleted_at_utc?: Date;
+  created_at_utc?: Date; // can default in DB
+  updated_at_utc?: Date;
+
   uuid?: string;
-  userUuid?: string;
-  genderPreference?: Gender;
-  gender?: Gender;
-  ageMinPreference: number;
-  ageMaxPreference: number;
+  user_uuid?: string;
+  gender_preference_man: boolean;
+  gender_preference_woman: boolean;
+  gender_man: boolean;
+  gender_woman: boolean;
+  age_min_preference: number;
+  age_max_preference: number;
   zipcode?: string;
-  zipcodePreference?: string;
+  zipcode_preference?: string;
   age?: number;
 }
 
 export interface DatingMatchPreferencesEntity {
   uuid?: string;
   userUuid?: string;
-  genderPreference: Gender;
-  gender?: Gender;
+  genderPreferenceMan: boolean;
+  genderPreferenceWoman: boolean;
+  genderMan: boolean;
+  genderWoman: boolean;
   ageMinPreference?: number;
   ageMaxPreference?: number;
   zipcode?: string;
@@ -46,10 +44,15 @@ export interface UserRecord {
   mobile?: string;
   email?: string;
   verified?: boolean;
-  lastSeenAtUtc?: Date;
+  last_seen_at_utc?: Date;
 
   // repo layer stuff
-  deletedAtUtc?: Date;
+  deleted_at_utc?: Date;
+  created_at_utc?: Date; // can default in DB
+
+  // hydrate
+  dating_preference?: DatingMatchPreferencesRecord;
+  videos?: VideoRecord[];
 }
 
 export interface UserEntity {
@@ -60,6 +63,6 @@ export interface UserEntity {
   lastSeenAtUtc?: Date;
 
   // hydrate
-  userDatingPreference?: DatingMatchPreferencesEntity;
-  videoEntities?: VideoEntity[];
+  datingPreference?: DatingMatchPreferencesEntity;
+  videos?: VideoEntity[];
 }

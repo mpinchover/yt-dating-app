@@ -1,0 +1,11 @@
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED BY 'test';
+FLUSH PRIVILEGES;
+
+DROP USER IF EXISTS 'test'@'localhost';
+CREATE USER 'test'@'localhost' IDENTIFIED BY 'test';
+FLUSH PRIVILEGES;
+
+GRANT ALL PRIVILEGES ON * . * TO 'test'@'localhost';
+
+DROP DATABASE IF EXISTS test;
+CREATE DATABASE test;

@@ -1,12 +1,11 @@
 import { VideoEntity } from "./video";
 
 export interface MatchRecord {
-  initiatorUuid?: string;
-  responderUuid?: string;
-  createdAtUtc?: Date;
-  deletedAtUtc?: Date;
-  updatedAtUtc?: Date;
-  // matchedUsersUuids: string[]; // just for now until better db, bc query depends on it
+  uuid?: string;
+  initiator_uuid?: string;
+  responder_uuid?: string;
+  created_at_utc?: Date;
+  deleted_at_utc?: Date;
 }
 
 export interface UserMatchingItemEntity {
@@ -14,9 +13,11 @@ export interface UserMatchingItemEntity {
   videoEntities: VideoEntity[];
 }
 
-export interface UserProfileSearchFilterRecord {
-  gender: string;
-  genderPreference: string;
+export interface UserSearchFilter {
+  genderMan: boolean;
+  genderWoman: boolean;
+  genderPreferenceMan: boolean;
+  genderPreferenceWoman: boolean;
   age: number;
   ageMinPreference: number;
   ageMaxPreference: number;
@@ -24,18 +25,17 @@ export interface UserProfileSearchFilterRecord {
 }
 
 export interface LikeRecord {
-  createdAtUtc?: Date;
-  updatedAtUtc?: Date;
-  deletedAtUtc?: Date;
-  initiatorUuid?: string;
-  receiverUuid?: string;
+  created_at_utc?: Date;
+  deleted_at_utc?: Date;
+  updated_at_utc?: Date;
+  initator_uuid?: string;
+  receiver_uuid?: string;
 }
 
 export interface BlockRecord {
-  initatorUuid?: string;
-  receiverUuid?: string;
-  createdAtUtc?: Date;
-  updatedAtUtc?: Date;
-  deletedAtUtc?: Date;
- //  blockedUserUuids: string[]; // just for now until better db, bc query depends on it
+  initator_uuid?: string;
+  receiver_uuid?: string;
+  created_at_utc?: Date;
+  deleted_at_utc?: Date;
+  updated_at_utc?: Date;
 }
