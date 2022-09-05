@@ -71,7 +71,7 @@ export class Repo {
       const query = `
         SELECT * FROM matches 
         where 
-          initiatorUuid = ? and responderUuid = ? or responderUuid = ? and initiatorUuid = ? `;
+          (initiator_uuid = ? and responder_uuid = ? or responder_uuid = ? and initiator_uuid = ?) and deleted_at_utc is null `;
       const [rows, fields] = await this.db.query(query, [
         uuid1,
         uuid2,
@@ -84,23 +84,10 @@ export class Repo {
       console.log(e);
       throw e;
     }
-    // const matchRecord: MatchRecord = await this.db
-    //   .collection("matches")
-    //   .findOne({
-    //     deletedAtUtc: null,
-    //     $or: [
-    //       {
-    //         $and: [{ initiatorUuid: uuid1 }, { responderUuid: uuid2 }],
-    //       },
-    //       {
-    //         $and: [{ initiatorUuid: uuid2 }, { responderUuid: uuid1 }],
-    //       },
-    //     ],
-    //   });
   };
 
   getMatchRecordByUuid = async (uuid: string): Promise<MatchRecord> => {
-    const query = `select * from matches where uuid = ?`;
+    const query = `select * from matches where uuid = ? and deleted_at_utc is null`;
     const [rows, fields] = await this.db.query(query, [uuid]);
     if (rows.length == 0) return null;
     return rows[0];
@@ -108,23 +95,26 @@ export class Repo {
 
   deleteMatchRecord = async (uuid: string) => {
     const curTime = new Date();
-    const query = "update matches set deleted_at_utc where uuid = ?";
-    await this.db.query(query, [curTime]);
+    const query = "update matches set deleted_at_utc = ? where uuid = ?";
+    await this.db.query(query, [curTime, uuid]);
   };
 
   /*
     get users matched to this uuid
   */
   getUserUuidsMatchedToUuid = async (uuid: string): Promise<string[]> => {
-    const query = `
-      select u.uuid from users u
-      inner join matches m on m.initiator_uuid = ? or m.responder_uuid = ?
-      where u.uuid is not ?
-   
-    `;
-    const [rows, fields] = await this.db.query(query, [uuid, uuid, uuid]);
+    const query = `select initiator_uuid, responder_uuid from matches
+    where (initiator_uuid = ? or responder_uuid = ?) and deleted_at_utc is null group by initiator_uuid, responder_uuid;
+      `;
+    const [rows, fields] = await this.db.query(query, [uuid, uuid]);
     if (rows.length == 0) return null;
-    return rows;
+
+    const results: string[] = [];
+    rows.forEach((doc) => {
+      if (doc.initiator_uuid != uuid) results.push(doc.initiator_uuid);
+      else results.push(doc.responder_uuid);
+    });
+    return results;
   };
 
   createBlockRecord = async (blockRecord: BlockRecord) => {
@@ -143,7 +133,7 @@ export class Repo {
     const query = `
     SELECT * FROM blocks 
     where 
-      initiator_uuid = ? and receiver_uuid = ? or receiver_uuid = ? and initiator_uuid = ? `;
+      (initiator_uuid = ? and receiver_uuid = ? or receiver_uuid = ? and initiator_uuid = ? ) and deleted_at_utc is null `;
     const [rows, fields] = await this.db.query(query, [
       uuid1,
       uuid2,
@@ -155,8 +145,8 @@ export class Repo {
   };
 
   getUsersWhoBlockedThisUuid = async (uuid: string): Promise<string[]> => {
-    const query = `SELECT * from blocks where receiver_uuid = ?`;
-    const [rows, fields] = this.db.query(query, [uuid]);
+    const query = `SELECT * from blocks where receiver_uuid = ? and deleted_at_utc is null`;
+    const [rows, fields] = await this.db.query(query, [uuid]);
     if (rows.length == 0) return null;
     return rows;
   };
@@ -165,43 +155,58 @@ export class Repo {
     await this.db.query("insert into likes set ? ", [params]);
   };
 
-  createLikeAndMatchRecords = async (
+  createLikeAndMatchRecordInTx = async (
     likeParams: LikeRecord,
     matchParams: MatchRecord
   ) => {
     await this.db.beginTransaction();
-    await this.createLikeRecord(likeParams);
-    await this.createMatchRecord(matchParams);
+    await this.db.createLikeAndMatchRecords(likeParams, matchParams);
     await this.db.commit();
   };
 
+  createLikeAndMatchRecords = async (
+    likeParams: LikeRecord,
+    matchParams: MatchRecord
+  ) => {
+    await this.createLikeRecord(likeParams);
+    await this.createMatchRecord(matchParams);
+  };
+
   createTrackedVideoRecord = async (trackedVideoRecord: TrackedVideoRecord) => {
-    await this.db.query("inset into tracked_videos", [trackedVideoRecord]);
+    await this.db.query("insert into tracked_videos set ?", [
+      trackedVideoRecord,
+    ]);
   };
 
   getVideoByVideoId = async (videoId: string): Promise<VideoRecord> => {
-    const query = `select * from videos where video_id = ?`;
+    const query = `select * from videos where video_id = ? and deleted_at_utc is null`;
     const [rows, fields] = await this.db.query(query, [videoId]);
     if (rows.length == 0) return null;
-    return rows;
+    return rows[0];
+  };
+
+  createVideoAndTrackedVideoInTx = async (
+    videoRecord: VideoRecord,
+    trackedVideoRecord: TrackedVideoRecord
+  ) => {
+    await this.db.beginTransaction();
+    await this.createVideoAndTrackedVideoRecords(
+      videoRecord,
+      trackedVideoRecord
+    );
+    await this.db.commit();
   };
 
   createVideoAndTrackedVideoRecords = async (
     videoRecord: VideoRecord,
     trackedVideoRecord: TrackedVideoRecord
   ) => {
-    await this.db.beginTransaction();
     await this.createVideo(videoRecord);
     await this.createTrackedVideoRecord(trackedVideoRecord);
-
-    await this.db.commit();
   };
 
-  // set the tracked video's deleted to now
   removeVideo = async (videoUuid: string) => {
-    const curTime = new Date().getTime();
-
-    await this.db.beginTransaction();
+    const curTime = new Date();
 
     const queryVideos = `update videos set deleted_at_utc = ? where uuid = ?`;
     await this.db.query(queryVideos, [curTime, videoUuid]);
@@ -210,11 +215,32 @@ export class Repo {
     await this.db.query(queryTrackedVideos, [curTime, videoUuid]);
   };
 
+  removeVideoInTx = async (videoUuid: string) => {
+    await this.db.beginTransaction();
+    await this.removeVideo(videoUuid);
+    await this.db.commit();
+  };
+
   createVideo = async (videoRecord: VideoRecord) => {
     const query = "INSERT INTO videos set ?";
     await this.db.query(query, [videoRecord]);
   };
 
+  swapVideosInTx = async (
+    newTrackedVideoRecordUuid: string,
+    userUuid: string,
+    incomingVideoUuid: string,
+    videoToReplaceUuid: string
+  ) => {
+    await this.db.beginTransaction();
+    await this.swapVideos(
+      newTrackedVideoRecordUuid,
+      userUuid,
+      incomingVideoUuid,
+      videoToReplaceUuid
+    );
+    await this.db.commit();
+  };
   // run in transaction to update the trackedRecord
   // so remove will be when we are in the beginning and want to take something back
   // swap will be once we have 5 youtueb videos, a user must swap videos if
@@ -234,16 +260,15 @@ export class Repo {
       throw new Error("existing tracked video not found");
     const deletedAtUtc = new Date();
 
-    await this.db.beginTransaction();
     let query = `update tracked_videos set deleted_at_utc = ? where uuid = ?`;
-    await this.db.query(query, [deletedAtUtc, existingTrackedRecord]);
+    await this.db.query(query, [deletedAtUtc, existingTrackedRecord.uuid]);
 
     const newTrackedRecord: TrackedVideoRecord = {
       user_uuid: userUuid,
       video_uuid: incomingVideoUuid,
       uuid: newTrackedVideoRecordUuid,
     };
-    query = `insert into tracked_videos set ?`;
+    query = `insert into tracked_videos SET ?`;
     await this.db.query(query, [newTrackedRecord]);
   };
 
@@ -304,7 +329,8 @@ export class Repo {
   ): Promise<TrackedVideoRecord[]> => {
     const records: TrackedVideoRecord[] = [];
 
-    const query = "select * from tracked_videos where user_uuid in (?)";
+    const query =
+      "select * from tracked_videos where user_uuid in (?) and deleted_at_utc is null";
     const [rows, fields] = await this.db.query(query, [userUuids]);
     if (rows.length == 0) return null;
     return rows;
@@ -313,7 +339,8 @@ export class Repo {
   getTrackedVideoByVideoUuid = async (
     videoUuid: string
   ): Promise<TrackedVideoRecord> => {
-    const query = "select * from tracked_videos where video_uuid = ?";
+    const query =
+      "select * from tracked_videos where video_uuid = ? and deleted_at_utc is null";
     const [rows, fields] = await this.db.query(query, [videoUuid]);
     if (rows.length == 0) return null;
     return rows[0];
@@ -427,10 +454,10 @@ export class Repo {
   };
 
   getDatingPreferencesByUserUuid = async (
-    uuid: string
+    userUuid: string
   ): Promise<DatingMatchPreferencesEntity> => {
-    const query = "select * from dating_match_preferences where uuid = ?";
-    const [rows, fields] = await this.db.query(query, [uuid]);
+    const query = "select * from dating_match_preferences where user_uuid = ?";
+    const [rows, fields] = await this.db.query(query, [userUuid]);
     if (rows.length == 0) return null;
     return rows[0];
   };

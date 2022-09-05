@@ -1,9 +1,5 @@
 require("reflect-metadata");
-
-const { container } = require("tsyringe");
 const { Repo } = require("../repo");
-const { clearTables } = require("./utils");
-const MongoClient = require("mongodb").MongoClient;
 var mysql = require("mysql2/promise");
 
 const expect = require("chai").expect;
@@ -36,6 +32,14 @@ describe("user test suite", async () => {
     conn.end();
   });
 
+  beforeEach(async () => {
+    await conn.beginTransaction();
+  });
+
+  afterEach(async () => {
+    await conn.rollback();
+  });
+
   /*
     export interface UserRecord {
       uuid?: string;
@@ -48,14 +52,12 @@ describe("user test suite", async () => {
   */
   it("create a user succesfully", async () => {
     try {
-      await conn.beginTransaction();
       const user = {
         uuid: "some-uuid",
         email: "some-email",
         verified: false,
       };
       await r.createUser(user); // create the user
-      await r.db.rollback();
     } catch (e) {
       console.log(e);
       throw e;
@@ -64,7 +66,6 @@ describe("user test suite", async () => {
 
   it("test rollback tx", async () => {
     try {
-      await conn.beginTransaction();
       const user = {
         uuid: "some-uuid",
         email: "some-email",
@@ -75,8 +76,6 @@ describe("user test suite", async () => {
       expect(user.uuid).to.equal(insertedUser.uuid);
       expect(user.email).to.equal(insertedUser.email);
       expect(user.verified).to.equal(!!insertedUser.verified);
-
-      await r.db.rollback();
     } catch (e) {
       console.log(e);
       throw e;
@@ -84,56 +83,78 @@ describe("user test suite", async () => {
   });
 });
 
-// describe("dating prefs testing suite", () => {
-//   let client;
-//   let db;
-//   const r = new Repo();
+describe("dating prefs testing suite", () => {
+  const r = new Repo();
+  let conn;
 
-//   before(async () => {
-//     try {
-//       const uri = "mongodb://127.0.0.1:27020/youtube-dating-app";
+  before(async () => {
+    try {
+      conn = await mysql.createConnection({
+        host: "localhost",
+        port: "3308",
+        user: "test",
+        password: "test",
+        database: "test",
+      });
+      r.db = conn;
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
+  });
 
-//       client = await MongoClient.connect(uri);
-//       db = client.db("youtube-dating-app");
-//       r.client = db;
-//       r.db = db;
-//     } catch (e) {
-//       console.log(e);
-//     }
-//   });
+  after(() => {
+    conn.end();
+  });
 
-//   beforeEach(async () => {
-//     await clearTables(db);
-//   });
+  beforeEach(async () => {
+    await conn.beginTransaction();
+  });
 
-//   afterEach(async () => {
-//     await clearTables(db);
-//   });
+  afterEach(async () => {
+    await conn.rollback();
+  });
 
-//   after(() => {
-//     client.close();
-//   });
+  it("create dating preferences", async () => {
+    const params = {
+      uuid: "some-uuid",
+      user_uuid: "some-user-uuid",
+      gender_preference_man: false,
+      gender_preference_woman: true,
+      gender_man: true,
+      gender_woman: false,
+      age_min_preference: 10,
+      age_max_preference: 12,
+      zipcode: "0203",
+      zipcode_preference: "0293",
+    };
 
-//   it("create dating preferences", async () => {
-//     const params = {
-//       _id: 0,
-//       uuid: "some-uuid",
-//       userUuid: "some-user-uuid",
-//       genderPreference: "MALE",
-//       gender: "FEMALE",
-//       ageMinPreference: 10,
-//       ageMaxPreference: 12,
-//       zipcode: "0203",
-//       zipcodePreference: "0293",
-//     };
-
-//     await r.createDatingPreferencesRecord(params);
-//     const insertedRecord = await r.getDatingPreferencesByUserUuid(
-//       params.userUuid
-//     );
-//     expect(params).to.eql(insertedRecord);
-//   });
-//   it("get users for matching", async () => {
-//     const userOne = {};
-//   });
-// });
+    await r.createDatingPreferencesRecord(params);
+    const insertedRecord = await r.getDatingPreferencesByUserUuid(
+      params.user_uuid
+    );
+    expect(params.uuid).to.equal(insertedRecord.uuid);
+    expect(params.user_uuid).to.equal(insertedRecord.user_uuid);
+    expect(params.gender_preference_man).to.equal(
+      !!insertedRecord.gender_preference_man
+    );
+    expect(params.gender_preference_woman).to.equal(
+      !!insertedRecord.gender_preference_woman
+    );
+    expect(params.gender_man).to.equal(!!insertedRecord.gender_man);
+    expect(params.gender_woman).to.equal(!!insertedRecord.gender_woman);
+    expect(params.age_min_preference).to.equal(
+      insertedRecord.age_min_preference
+    );
+    expect(params.age_max_preference).to.equal(
+      insertedRecord.age_max_preference
+    );
+    expect(params.zipcode).to.equal(insertedRecord.zipcode);
+    expect(params.zipcode_preference).to.equal(
+      insertedRecord.zipcode_preference
+    );
+  });
+  it("get users for matching", async () => {
+    const userOne = {};
+  });
+});

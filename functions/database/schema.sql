@@ -9,10 +9,10 @@ CREATE TABLE users (
     deleted_at_utc DATETIME,
     created_at_utc DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY unique_uuid (uuid)
-)
+);
 
 DROP TABLE IF EXISTS videos;
-CREATE TABLE users (
+CREATE TABLE videos (
     id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
     uuid varchar(20) NOT NULL,
     deleted_at_utc DATETIME,
@@ -25,7 +25,7 @@ CREATE TABLE users (
     category_id varchar(20),
     topic_categories TEXT,
     UNIQUE KEY unique_uuid (uuid)
-)
+);
 
 DROP TABLE IF EXISTS tracked_videos;
 CREATE TABLE tracked_videos (
@@ -36,9 +36,9 @@ CREATE TABLE tracked_videos (
 
     video_uuid varchar(20),
     user_uuid varchar(20),
-    order INT,
+    order_index INTEGER,
     UNIQUE KEY unique_uuid (uuid)
-)
+);
 
 DROP TABLE IF EXISTS dating_match_preferences;
 CREATE TABLE dating_match_preferences (
@@ -55,10 +55,11 @@ CREATE TABLE dating_match_preferences (
     age_min_preference INT,
     age_max_preference INT,
     zipcode varchar(20),
-    zipcode_preference(20),
-    age INT,
+    zipcode_preference varchar(20),
+    age INTEGER,
     UNIQUE KEY unique_uuid (uuid)
-)
+
+);
 
 DROP TABLE IF EXISTS matches;
 CREATE TABLE matches (
@@ -71,7 +72,7 @@ CREATE TABLE matches (
     responder_uuid varchar(20),
   
     UNIQUE KEY unique_uuid (uuid)
-)
+);
 
 DROP TABLE IF EXISTS likes;
 CREATE TABLE likes (
@@ -84,7 +85,7 @@ CREATE TABLE likes (
     receiver_uuid varchar(20),
   
     UNIQUE KEY unique_uuid (uuid)
-)
+);
 
 DROP TABLE IF EXISTS blocks;
 CREATE TABLE blocks (
@@ -97,4 +98,4 @@ CREATE TABLE blocks (
     receiver_uuid varchar(20),
   
     UNIQUE KEY unique_uuid (uuid)
-)
+);

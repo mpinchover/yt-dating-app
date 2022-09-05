@@ -1,119 +1,128 @@
-// require("reflect-metadata");
+require("reflect-metadata");
+var mysql = require("mysql2/promise");
+const { Repo } = require("../repo");
+const expect = require("chai").expect;
+// var sinonChai = require("sinon-chai");
+// const sinon = require("sinon");
 
-// const { container } = require("tsyringe");
-// const { Repo } = require("../repo");
-// const { clearTables } = require("./utils");
-// const MongoClient = require("mongodb").MongoClient;
-// const expect = require("chai").expect;
-// // var sinonChai = require("sinon-chai");
-// // const sinon = require("sinon");
+describe("match test suite", () => {
+  const r = new Repo();
+  let client;
 
-// describe("match test suite", () => {
-//   let client;
-//   let db;
-//   const r = new Repo();
+  before(async () => {
+    try {
+      conn = await mysql.createConnection({
+        host: "localhost",
+        port: "3308",
+        user: "test",
+        password: "test",
+        database: "test",
+      });
+      r.db = conn;
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
+  });
 
-//   before(async () => {
-//     try {
-//       const uri = "mongodb://127.0.0.1:27020/youtube-dating-app";
-//       client = await MongoClient.connect(uri);
-//       db = client.db("youtube-dating-app");
-//       r.client = db;
-//       r.db = db;
-//     } catch (e) {
-//       console.log(e);
-//     }
-//   });
+  after(() => {
+    conn.end();
+  });
 
-//   after(() => {
-//     client.close();
-//   });
+  beforeEach(async () => {
+    await conn.beginTransaction();
+  });
 
-//   beforeEach(async () => {
-//     await clearTables(db);
-//   });
+  afterEach(async () => {
+    await conn.rollback();
+  });
 
-//   afterEach(async () => {
-//     await clearTables(db);
-//   });
+  /*
+    export interface MatchRecord {
+        initiatorUuid?: string;
+        responderUuid?: string;
+        createdAtUtc?: Date;
+        deletedAtUtc?: Date;
+        updatedAtUtc?: Date;
+    }
+  */
+  it("create a match succesfully", async () => {
+    try {
+      const match = {
+        uuid: "some-uuid",
+        initiator_uuid: "in-some-uuid",
+        responder_uuid: "re-some-uuid",
+      };
+      await r.createMatchRecord(match); // create the match
 
-//   /*
-//     export interface MatchRecord {
-//         initiatorUuid?: string;
-//         responderUuid?: string;
-//         createdAtUtc?: Date;
-//         deletedAtUtc?: Date;
-//         updatedAtUtc?: Date;
-//     }
-//   */
-//   it("create a match succesfully", async () => {
-//     try {
-//       const match = {
-//         _id: "some-id",
-//         uuid: "some-uuid",
-//         initiatorUuid: "initiator-some-uuid",
-//         responderUuid: "responder-some-uuid",
-//       };
-//       await r.createMatchRecord(match); // create the match
+      let insertedMatch = await r.getMatchRecordByUuid(match.uuid);
+      expect(match.initiator_uuid).to.equal(insertedMatch.initiator_uuid);
+      expect(match.responder_uuid).to.equal(insertedMatch.responder_uuid);
 
-//       let insertedMatch = await r.getMatchRecordByUuid(match.uuid);
-//       expect(match).to.eql(insertedMatch);
-//       insertedMatch = await r.getMatchRecordByUuids(
-//         match.initiatorUuid,
-//         match.responderUuid
-//       );
-//       expect(match).to.eql(insertedMatch);
-//       insertedMatch = await r.getMatchRecordByUuids(
-//         match.initiatorUuid,
-//         match.initiatorUuid
-//       );
-//       expect(null).to.eql(insertedMatch);
-//       insertedMatch = await r.getMatchRecordByUuid("new-uuid");
-//       expect(null).to.eql(insertedMatch);
-//       await r.deleteMatchRecord(match.uuid);
-//       insertedMatch = await r.getMatchRecordByUuid(match.uuid);
-//       expect(null).to.eql(insertedMatch);
-//       insertedMatch = await r.getMatchRecordByUuids(
-//         match.initiatorUuid,
-//         match.responderUuid
-//       );
-//       expect(null).to.eql(insertedMatch);
-//     } catch (e) {
-//       console.log(e);
-//       throw e;
-//     }
-//   });
+      insertedMatch = await r.getMatchRecordByUuids(
+        match.initiator_uuid,
+        match.responder_uuid
+      );
+      expect(match.initiator_uuid).to.equal(insertedMatch.initiator_uuid);
+      expect(match.responder_uuid).to.equal(insertedMatch.responder_uuid);
 
-//   it("get matched users to a uuid", async () => {
-//     try {
-//       const userUuid = "some-uuid-1";
-//       let match = {
-//         _id: "some-id-3",
-//         uuid: "some-uuid-1",
-//         initiatorUuid: userUuid,
-//         responderUuid: "responder-some-uuid-2",
-//       };
-//       await r.createMatchRecord(match); // create the match
-//       match = {
-//         _id: "some-id-9",
-//         uuid: "some-uuid-2",
-//         responderUuid: userUuid,
-//         initiatorUuid: "responder-some-uuid-3",
-//       };
-//       await r.createMatchRecord(match); // create the match
-//       match = {
-//         _id: "some-id-10",
-//         uuid: "some-uuid-3",
-//         responderUuid: "initiator-some-uuid-4",
-//         initiatorUuid: "responder-some-uuid-5",
-//       };
-//       await r.createMatchRecord(match); // create the match
+      insertedMatch = await r.getMatchRecordByUuids(
+        match.initiator_uuid,
+        match.initiator_uuid
+      );
+      expect(null).to.eql(insertedMatch);
+      insertedMatch = await r.getMatchRecordByUuid("new-uuid");
+      expect(null).to.eql(insertedMatch);
+      await r.deleteMatchRecord(match.uuid);
+      insertedMatch = await r.getMatchRecordByUuid(match.uuid);
+      expect(null).to.eql(insertedMatch);
+      insertedMatch = await r.getMatchRecordByUuids(
+        match.initiator_uuid,
+        match.responder_uuid
+      );
+      expect(null).to.eql(insertedMatch);
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
+  });
 
-//       const userUuids = await r.getUserUuidsMatchedToUuid(userUuid);
-//       expect(2).to.equal(userUuids.length);
-//     } catch (e) {
-//       console.log(e);
-//       throw e;
-//     }
-//   });
-// });
+  it("get matched users to a uuid", async () => {
+    try {
+      const userUuid = "some-uuid-1";
+      let match = {
+        uuid: "some-uuid-1",
+        initiator_uuid: userUuid,
+        responder_uuid: "re-uuid-",
+      };
+      await r.createMatchRecord(match); // create the match
+      let insertedMatchedRecord = await r.getMatchRecordByUuid(match.uuid);
+      expect(match.uuid).to.equal(insertedMatchedRecord.uuid);
+
+      match = {
+        uuid: "some-uuid-2",
+        responder_uuid: userUuid,
+        initiator_uuid: "responder-uuid-3",
+      };
+      await r.createMatchRecord(match); // create the match
+      insertedMatchedRecord = await r.getMatchRecordByUuid(match.uuid);
+      expect(match.uuid).to.equal(insertedMatchedRecord.uuid);
+
+      match = {
+        uuid: "some-uuid-3",
+        responder_uuid: "in-some-uuid-4",
+        initiator_uuid: "res-some-uuid-5",
+      };
+
+      await r.createMatchRecord(match); // create the match
+      insertedMatchedRecord = await r.getMatchRecordByUuid(match.uuid);
+      expect(match.uuid).to.equal(insertedMatchedRecord.uuid);
+
+      const userUuids = await r.getUserUuidsMatchedToUuid(userUuid);
+      expect(2).to.equal(userUuids.length);
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
+  });
+});

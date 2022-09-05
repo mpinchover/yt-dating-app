@@ -34,7 +34,7 @@ export interface TrackedVideoRecord {
   uuid?: string;
   video_uuid?: string;
   user_uuid?: string;
-  order?: number; // would be good to display content in an order as well
+  order_index?: number; // would be good to display content in an order as well
 }
 
 export interface TrackedVideoEntity {

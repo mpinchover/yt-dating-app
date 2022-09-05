@@ -1,111 +1,93 @@
-// require("reflect-metadata");
+require("reflect-metadata");
 
-// const { doesNotMatch } = require("assert");
-// const { container } = require("tsyringe");
-// const { Repo } = require("../repo");
-// const MongoClient = require("mongodb").MongoClient;
-// const { clearTables } = require("./utils");
-// const expect = require("chai").expect;
-// // var sinonChai = require("sinon-chai");
-// // const sinon = require("sinon");
+var mysql = require("mysql2/promise");
+const { Repo } = require("../repo");
+const expect = require("chai").expect;
+// var sinonChai = require("sinon-chai");
+// const sinon = require("sinon");
 
-// describe("like test suite", () => {
-//   let client;
-//   let db;
-//   const r = new Repo();
-//   const test = "like-test-suite";
+describe("like test suite", () => {
+  const r = new Repo();
+  let conn;
 
-//   before(async () => {
-//     try {
-//       const uri = `mongodb://127.0.0.1:27020/${test}`;
-//       client = await MongoClient.connect(uri);
-//       db = client.db(test);
-//       r.client = client;
-//       r.db = db;
-//     } catch (e) {
-//       console.log(e);
-//     }
-//   });
+  before(async () => {
+    try {
+      conn = await mysql.createConnection({
+        host: "localhost",
+        port: "3308",
+        user: "test",
+        password: "test",
+        database: "test",
+      });
+      r.db = conn;
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
+  });
 
-//   beforeEach(async () => {
-//     await clearTables(db);
-//   });
+  after(() => {
+    conn.end();
+  });
 
-//   afterEach(async () => {
-//     await clearTables(db);
-//   });
+  beforeEach(async () => {
+    await conn.beginTransaction();
+  });
 
-//   after(() => {
-//     client.close();
-//   });
+  afterEach(async () => {
+    await conn.rollback();
+  });
 
-//   beforeEach(async () => {
-//     // const collNames = await db.listCollections().toArray();
-//     // collNames.forEach(async (col) => {
-//     //   await db.collection(col.name).drop();
-//     // });
-//   });
+  it("create a like succesfully", async () => {
+    try {
+      let like = {
+        uuid: "some-uuid",
+        initiator_uuid: "init-some-uuid",
+        receiver_uuid: "rec-some-uuid",
+      };
+      await r.createLikeRecord(like); // create the like
+      let insertedLike = await r.getLikeRecord(
+        like.initiator_uuid,
+        like.receiver_uuid
+      );
+      expect(like.initiator_uuid).to.equal(insertedLike.initiator_uuid);
+      expect(like.receiver_uuid).to.equal(insertedLike.receiver_uuid);
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
+  });
+  it("create like and match records", async () => {
+    try {
+      const receiverUuid = "rec-some-uuid";
+      const initiatorUuid = "init-some-uuid";
+      let like = {
+        uuid: "some-uuid-1",
+        initiator_uuid: initiatorUuid,
+        receiver_uuid: receiverUuid,
+      };
 
-//   /*
-//     export interface MatchRecord {
-//         initiatorUuid?: string;
-//         responderUuid?: string;
-//         createdAtUtc?: Date;
-//         deletedAtUtc?: Date;
-//         updatedAtUtc?: Date;
-//     }
-//   */
-//   it("create a like succesfully", async () => {
-//     try {
-   
-//       let like = {
-//         _id: "some-id",
-//         uuid: "some-uuid",
-//         initiatorUuid: "initiator-some-uuid",
-//         receiverUuid: "receiver-some-uuid",
-//       };
-//       await r.createLikeRecord(like); // create the like
-//       let insertedLike = await r.getLikeRecord(
-//         like.initiatorUuid,
-//         like.receiverUuid
-//       );
-//       expect(like).to.eql(insertedLike);
-//     } catch (e) {
-//       console.log(e);
-//       throw e;
-//     }
-//   });
-//   it("create like and match records", async () => {
-//     try {
-    
-//       const receiverUuid = "receiver-some-uuid";
-//       const initiatorUuid = "initiator-some-uuid";
-//       let like = {
-//         _id: "some-id-9",
-//         uuid: "some-uuid-1",
-//         initiatorUuid,
-//         receiverUuid,
-//       };
+      let match = {
+        uuid: "some-uuid-2",
+        initiator_uuid: initiatorUuid,
+        responder_uuid: receiverUuid,
+      };
 
-//       let match = {
-//         _id: "some-id-19",
-//         uuid: "some-uuid-2",
-//         initiatorUuid,
-//         responderUuid: receiverUuid,
-//       };
+      await r.createLikeAndMatchRecords(like, match);
 
-//       await r.createLikeAndMatchRecords(like, match);
+      const insertedLike = await r.getLikeRecord(
+        like.initiator_uuid,
+        like.receiver_uuid
+      );
+      expect(like.initiator_uuid).to.equal(insertedLike.initiator_uuid);
+      expect(like.receiver_uuid).to.equal(insertedLike.receiver_uuid);
 
-//       const insertedLike = await r.getLikeRecord(
-//         like.initiatorUuid,
-//         like.receiverUuid
-//       );
-//       expect(like).to.eql(insertedLike);
-//       const insertedMatch = await r.getMatchRecordByUuid(match.uuid);
-//       expect(match).to.eql(insertedMatch);
-//     } catch (e) {
-//       console.log(e);
-//       throw e;
-//     }
-//   });
-// });
+      const insertedMatch = await r.getMatchRecordByUuid(match.uuid);
+      expect(match.initiator_uuid).to.equal(insertedMatch.initiator_uuid);
+      expect(match.responder_uuid).to.equal(insertedMatch.responder_uuid);
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
+  });
+});
