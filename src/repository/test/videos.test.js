@@ -2,7 +2,6 @@ require("reflect-metadata");
 
 const { container } = require("tsyringe");
 const { Repo } = require("../repo");
-const { clearTables } = require("./utils");
 
 var mysql = require("mysql2/promise");
 const MongoClient = require("mongodb").MongoClient;

@@ -4,7 +4,6 @@ import { BlockRecord } from "../types/match";
 import { Repo } from "../repository/repo";
 import { AWSGateway } from "../gateway/aws";
 import { YoutubeGateway } from "../gateway/youtube";
-import { FirebaseController } from "./firebase-controller";
 import { SettingsController } from "./settings-controller";
 import { userEntityToRecord } from "../utils/mapper-user";
 import { videoGatewayToRecord } from "../utils/mapper-video";
@@ -19,7 +18,6 @@ export class UserController {
   repo: Repo;
   awsGateway: AWSGateway;
   youtubeGateway: YoutubeGateway;
-  firebaseController: FirebaseController;
   settingsController: SettingsController;
   name: string;
 
@@ -28,7 +26,6 @@ export class UserController {
     this.repo = container.resolve(Repo);
     this.awsGateway = container.resolve(AWSGateway);
     this.youtubeGateway = container.resolve(YoutubeGateway);
-    this.firebaseController = container.resolve(FirebaseController);
     this.settingsController = container.resolve(SettingsController);
   }
   /*
@@ -52,71 +49,48 @@ export class UserController {
     await this.repo.createUser(userRecord);
   };
 
-  verifyUser = async () => {};
-
-  createUserPassword = async () => {};
-
   deleteUser = async (params: deleteUserParams) => {
     await this.repo.deleteUserByUuid(params.uuid);
   };
 
   createVideoAndTrackedVideo = async (params: addMediaLinkParams) => {
-    let videoRecord: VideoRecord = await this.repo.getVideoByVideoId(
-      params.mediaId
-    );
-    // if the video record exists, just create the treacked video record
-    if (videoRecord) {
+    try {
+      let videoRecord: VideoRecord = await this.repo.getVideoByVideoId(
+        params.mediaId
+      );
+      // if the video record exists, just create the treacked video record
+      if (videoRecord) {
+        const trackedVideoRecord: TrackedVideoRecord = {
+          video_uuid: videoRecord.uuid,
+          user_uuid: params.userUuid,
+        };
+        await this.repo.createTrackedVideoRecord(trackedVideoRecord);
+        return;
+      }
+
+      const videoDetails = await this.youtubeGateway.getYoutubeDetailsByVideoId(
+        params.mediaId
+      );
+      videoRecord = videoGatewayToRecord(videoDetails);
+      videoRecord.uuid = uuidv4();
+
       const trackedVideoRecord: TrackedVideoRecord = {
         video_uuid: videoRecord.uuid,
         user_uuid: params.userUuid,
       };
-      await this.repo.createTrackedVideoRecord(trackedVideoRecord);
-      return;
-    }
-
-    const videoDetails = await this.youtubeGateway.getYoutubeDetailsByVideoId(
-      params.mediaId
-    );
-    videoRecord = videoGatewayToRecord(videoDetails);
-    videoRecord.uuid = uuidv4();
-
-    const trackedVideoRecord: TrackedVideoRecord = {
-      video_uuid: videoRecord.uuid,
-      user_uuid: params.userUuid,
-    };
-    // create video record and tracked video record in tx
-    await this.repo.createVideoAndTrackedVideoRecords(
-      videoRecord,
-      trackedVideoRecord
-    );
-  };
-
-  // always have at least 5 media links
-  swapVideos = async (params: swapVideosParams) => {
-    // first check to see if the video exists
-    let newVideo = await this.repo.getVideoByVideoId(params.incomingVideoId);
-    if (!newVideo) {
-      // if the video doesnt exist, create the uuid for it
-      // create the video
-      const videoDetails = await this.youtubeGateway.getYoutubeDetailsByVideoId(
-        params.incomingVideoId
+      // create video record and tracked video record in tx
+      await this.repo.createVideoAndTrackedVideoInTx(
+        videoRecord,
+        trackedVideoRecord
       );
-      newVideo = videoGatewayToRecord(videoDetails);
-      newVideo.uuid = uuidv4();
-
-      await this.repo.createVideo(newVideo);
+    } catch (e) {
+      console.log(e);
+      throw e;
     }
-
-    const newTrackedVideoRecordUuid = uuidv4();
-    await this.repo.swapVideos(
-      newTrackedVideoRecordUuid,
-      params.userUuid,
-      newVideo.uuid,
-      params.videoToBeReplacedUuid
-    );
   };
 
   likeUser = async (params: likeProfileParams) => {
+    // throw new Error("SOME RR");
     // first make sure this profile is not a current match
     const existingMatch = await this.repo.getMatchRecordByUuids(
       params.initiatorUuid,
@@ -124,12 +98,13 @@ export class UserController {
     );
     if (existingMatch) throw new Error("profile has already been matched");
     // then make sure these two people haven't blocked each other
-
     const blockedRecord = await this.repo.getBlockedByUserUuids(
       params.initiatorUuid,
       params.likedProfileUuid
     );
-    if (blockedRecord) throw new Error("this profile has been blocked");
+    if (blockedRecord) {
+      throw new Error("this profile has been blocked");
+    }
     // check to see if the other party has already liked this profile
     // if so, create a match
     const likeRecord = await this.repo.getLikeRecord(
@@ -149,7 +124,7 @@ export class UserController {
         initiator_uuid: params.likedProfileUuid, // they already liked the initiator
         responder_uuid: params.initiatorUuid,
       };
-      await this.repo.createLikeAndMatchRecords(likeParams, matchParams);
+      await this.repo.createLikeAndMatchRecordInTx(likeParams, matchParams);
       return;
     }
     await this.repo.createLikeRecord(likeParams);
@@ -205,10 +180,4 @@ interface deleteMediaLinkParams {
   userUuid: string;
   incomingMediaId: string;
   mediaToBeReplacedId: string;
-}
-
-interface swapVideosParams {
-  userUuid: string;
-  incomingVideoId: string; // the youtube ID
-  videoToBeReplacedUuid: string;
 }

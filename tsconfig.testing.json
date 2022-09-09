@@ -5,5 +5,5 @@
     "module": "commonjs",
     "target": "es6"
   },
-  "include": ["**/*.spec.ts, **/*.spec.js"]
+  "include": ["**/*.spec.ts, **/*.spec.js", "**/*.spec.ts, **/*.spec.ts"]
 }
