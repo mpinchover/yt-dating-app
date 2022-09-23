@@ -3,13 +3,10 @@ import {
   UserEntity,
   UserRecord,
   DatingMatchPreferencesRecord,
-} from "../types/user";
-import {
-  MatchRecord,
-  BlockRecord,
   UserSearchFilter,
-  LikeRecord,
-} from "../types/match";
+  Gender,
+} from "../types/user";
+import { MatchRecord, BlockRecord, LikeRecord } from "../types/match";
 import { datingMatchPrefRecordToEntity } from "../utils/mapper-user";
 import { VideoEntity, VideoRecord, TrackedVideoRecord } from "../types/video";
 import { injectable, singleton } from "tsyringe";
@@ -304,10 +301,19 @@ export class Repo {
     return rows[0];
   };
 
+  _createUser = async (params: UserRecord) => {
+    try {
+      await this.db.query("INSERT INTO users SET ?", params);
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
+  };
+
   createUser = async (params: UserRecord) => {
     // await this.db.collection("users").insertOne(params);
     try {
-      await this.db.query("INSERT INTO users SET ?", params);
+      await this._createUser(params);
     } catch (e) {
       console.log(e);
       throw e;
@@ -382,94 +388,99 @@ export class Repo {
   // make sure to include joins to not get people
   // who are already matched to this user
   // who are blocked (can then drop the user_uuid not in)
-  //
   getUsersForMatching = async (
     filters: UserSearchFilter
   ): Promise<UserRecord[]> => {
-    const {
-      genderMan,
-      genderWoman,
-      genderPreferenceMan,
-      genderPreferenceWoman,
+    let {
+      gender, // what gender I am
+      genderPreference, // what my gender preference is
+      ageMinPreference, // what my age min preference is
       ageMaxPreference,
-      ageMinPreference,
-      age,
+      age, // what my age is
       userUuidsToFilterOut,
     } = filters;
 
+    // if i'm a man, i want someone looking for a man or men and women
+    let genderSearchQuery;
+    if (gender === Gender.MAN) {
+      genderSearchQuery = [Gender[Gender.MAN], Gender[Gender.BOTH]];
+    } else if (gender == Gender.WOMAN) {
+      genderSearchQuery = [Gender[Gender.WOMAN], Gender[Gender.BOTH]];
+    } else {
+      throw new Error("invalid selection for gender search query");
+    }
+
+    // if i'm open to men and women, i want someone who identifies as either
+    let genderPrefSearchQuery;
+    if (genderPreference === Gender.MAN || genderPreference === Gender.WOMAN) {
+      genderPrefSearchQuery = [Gender[genderPreference]];
+    } else if (genderPreference === Gender.BOTH) {
+      genderPrefSearchQuery = [Gender[Gender.MAN], Gender[Gender.WOMAN]];
+    } else {
+      throw new Error("invalid selection for gender preference");
+    }
+
+    if (!userUuidsToFilterOut) userUuidsToFilterOut = ["garbage"];
+
     let query = `
-      select * from dating_match_preferences where 
-        dmp.gender_man = ? and
-        dmp.gender_woman = ? and 
-        dmp.gender_preference_man = ? and
-        dmp.gender_preference_woman = ? and
-        dmp.age <=  ? and 
-        dmp.age >= ? and 
-        dmp.age_max_preference >= ? and
-        dmp.age_min_preference <= ? and 
-        user_uuid not in (?)
-    `;
+    select u.* from users u
+    join dating_match_preferences dmp on
+      dmp.gender in (?) and
+      dmp.gender_preference in (?) and
+      dmp.age <=  ? and
+      dmp.age >= ? and
+      dmp.age_max_preference >= ? and
+      dmp.age_min_preference <= ? and 
+      dmp.deleted_at_utc is null and
+      dmp.user_uuid = u.uuid
+    where u.uuid not in (?) and 
+    u.verified = true and u.deleted_at_utc is null `;
 
     // need to do some processing on the gender
     let [rows, fields] = await this.db.query(query, [
-      genderPreferenceMan,
-      genderPreferenceWoman,
-      genderMan,
-      genderWoman,
+      genderPrefSearchQuery, // their gender matches my gender preference
+      genderSearchQuery, // my gender is in their gender preferences
       ageMaxPreference,
       ageMinPreference,
       age,
       age,
+      userUuidsToFilterOut,
     ]);
     if (rows.length == 0) return null;
 
-    const dmps: DatingMatchPreferencesRecord[] = rows;
-    const userUuidToDatingPref = new Map<
-      string,
-      DatingMatchPreferencesRecord
-    >();
-    const userUuidToVideos = new Map<string, VideoEntity[]>();
-
-    dmps.forEach((datingPrefEntity: DatingMatchPreferencesRecord) => {
-      userUuidToDatingPref.set(datingPrefEntity.user_uuid, datingPrefEntity);
-    });
-
-    // now get their associated videos
-    const videoUuidToUserUuid = new Map<string, string>();
-    const trackedVideoRecords = await this.getTrackedVideosByUserUuids(
-      Array.from(userUuidToDatingPref.keys())
-    );
-
-    trackedVideoRecords.forEach((trackedVideo) => {
-      videoUuidToUserUuid.set(trackedVideo.video_uuid, trackedVideo.user_uuid);
-    });
-
-    const videos = await this.getVideosByUuids(
-      Array.from(videoUuidToUserUuid.keys())
-    );
-
-    videos.forEach((video) => {
-      const userUuid = videoUuidToUserUuid.get(video.uuid);
-      userUuidToVideos.get(userUuid).push(video);
-    });
-
-    query = "select * from users where uuid in (?)";
-    [rows, fields] = await this.db.query(query, [
-      Array.from(userUuidToVideos.keys()),
-    ]);
-    if (rows.length == 0) return null;
-
-    const users: UserRecord[] = rows;
-    users.forEach((doc) => {
-      const { uuid } = doc;
-      const user: UserRecord = {
-        uuid,
-        dating_preference: userUuidToDatingPref.get(uuid),
-        videos: userUuidToVideos.get(uuid),
+    const userUuids = rows.map((user) => user.uuid);
+    const usersMap = new Map<String, UserRecord>();
+    rows.forEach((row) => {
+      // make this a mapper function
+      const userRecord: UserRecord = {
+        ...row,
+        videos: [],
       };
-      users.push(user);
+      usersMap.set(row.uuid, userRecord);
     });
-    return users;
+
+    query = `
+    select v.*, u.uuid as user_uuid
+    from 
+      videos v
+    join tracked_videos tv on tv.video_uuid = v.uuid
+    join users u on tv.user_uuid = u.uuid
+    where u.uuid in (?) and v.deleted_at_utc is null
+    
+  `;
+
+    [rows, fields] = await this.db.query(query, [userUuids]);
+    if (rows.length == 0) return null;
+    rows.forEach((row) => {
+      if (usersMap.has(row.user_uuid)) {
+        const userUuid = row.user_uuid;
+        delete row.user_uuid;
+
+        usersMap.get(userUuid).videos.push(row);
+      }
+    });
+
+    return Array.from(usersMap.values());
   };
 
   getDatingPreferencesByUserUuid = async (

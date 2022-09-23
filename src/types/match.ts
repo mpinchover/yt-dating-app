@@ -13,22 +13,11 @@ export interface UserMatchingItemEntity {
   videoEntities: VideoEntity[];
 }
 
-export interface UserSearchFilter {
-  genderMan: boolean;
-  genderWoman: boolean;
-  genderPreferenceMan: boolean;
-  genderPreferenceWoman: boolean;
-  age: number;
-  ageMinPreference: number;
-  ageMaxPreference: number;
-  userUuidsToFilterOut: string[];
-}
-
 export interface LikeRecord {
   created_at_utc?: Date;
   deleted_at_utc?: Date;
   updated_at_utc?: Date;
-  initator_uuid?: string;
+  initiator_uuid?: string;
   receiver_uuid?: string;
 }
 

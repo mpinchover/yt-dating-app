@@ -5,6 +5,14 @@ user {
 
 */
 
+export enum Gender {
+  MAN,
+  WOMAN,
+  NON_BINARY,
+  BOTH,
+  ALL,
+}
+
 import { VideoEntity, VideoRecord } from "./video";
 
 export interface DatingMatchPreferencesRecord {
@@ -14,10 +22,8 @@ export interface DatingMatchPreferencesRecord {
 
   uuid?: string;
   user_uuid?: string;
-  gender_preference_man: boolean;
-  gender_preference_woman: boolean;
-  gender_man: boolean;
-  gender_woman: boolean;
+  gender: string;
+  gender_preference: string;
   age_min_preference: number;
   age_max_preference: number;
   zipcode?: string;
@@ -28,10 +34,8 @@ export interface DatingMatchPreferencesRecord {
 export interface DatingMatchPreferencesEntity {
   uuid?: string;
   userUuid?: string;
-  genderPreferenceMan: boolean;
-  genderPreferenceWoman: boolean;
-  genderMan: boolean;
-  genderWoman: boolean;
+  gender: Gender;
+  genderPreference: Gender;
   ageMinPreference?: number;
   ageMaxPreference?: number;
   zipcode?: string;
@@ -65,4 +69,14 @@ export interface UserEntity {
   // hydrate
   datingPreference?: DatingMatchPreferencesEntity;
   videos?: VideoEntity[];
+}
+
+export interface UserSearchFilter {
+  genderMan: boolean;
+  gender: Gender;
+  genderPreference: Gender;
+  age: number;
+  ageMinPreference: number;
+  ageMaxPreference: number;
+  userUuidsToFilterOut: string[];
 }

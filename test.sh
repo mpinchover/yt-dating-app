@@ -1,4 +1,19 @@
 #!/bin/sh
+
+ENV=""
+DEV=""
+
+while getopts "td:" OPTION; do
+    case $OPTION in
+    t)
+        ENV=UNIT_TEST
+        ;;
+    d)
+        ENV=DEV
+        ;;
+    esac
+done
+
 RUNTIME_ENV="TEST" 
 HOST="localhost"
 
@@ -19,8 +34,8 @@ fi
 # docker run -d --name mysql-unit-test -p 3308:3306 -e MYSQL_ROOT_PASSWORD=test  mysql:8.0.0
 # sleep 10
 
-mysql -uroot -ptest -h 127.0.0.1 -P 3308 --ssl-mode=DISABLED < ../database/setup-unit-test.sql
-mysql -uroot -ptest -h 127.0.0.1 -P 3308 --ssl-mode=DISABLED --database=test < ../database/schema.sql 
+mysql -uroot -ptest -h 127.0.0.1 -P 3308 --ssl-mode=DISABLED < database/setup-unit-test.sql
+mysql -uroot -ptest -h 127.0.0.1 -P 3308 --ssl-mode=DISABLED --database=test < database/schema.sql 
 npm run test
 
 

@@ -119,10 +119,8 @@ describe("dating prefs testing suite", () => {
     const params = {
       uuid: "some-uuid",
       user_uuid: "some-user-uuid",
-      gender_preference_man: false,
-      gender_preference_woman: true,
-      gender_man: true,
-      gender_woman: false,
+      gender_preference: "WOMAN",
+      gender: "MAN",
       age_min_preference: 10,
       age_max_preference: 12,
       zipcode: "0203",
@@ -135,14 +133,8 @@ describe("dating prefs testing suite", () => {
     );
     expect(params.uuid).to.equal(insertedRecord.uuid);
     expect(params.user_uuid).to.equal(insertedRecord.user_uuid);
-    expect(params.gender_preference_man).to.equal(
-      !!insertedRecord.gender_preference_man
-    );
-    expect(params.gender_preference_woman).to.equal(
-      !!insertedRecord.gender_preference_woman
-    );
-    expect(params.gender_man).to.equal(!!insertedRecord.gender_man);
-    expect(params.gender_woman).to.equal(!!insertedRecord.gender_woman);
+    expect(params.gender).to.equal(insertedRecord.gender);
+    expect(params.gender_preference).to.equal(insertedRecord.gender_preference);
     expect(params.age_min_preference).to.equal(
       insertedRecord.age_min_preference
     );
@@ -153,8 +145,5 @@ describe("dating prefs testing suite", () => {
     expect(params.zipcode_preference).to.equal(
       insertedRecord.zipcode_preference
     );
-  });
-  it("get users for matching", async () => {
-    const userOne = {};
   });
 });

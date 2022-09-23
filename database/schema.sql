@@ -48,10 +48,8 @@ CREATE TABLE dating_match_preferences (
     created_at_utc DATETIME DEFAULT CURRENT_TIMESTAMP,
 
     user_uuid varchar(20),
-    gender_preference_man BOOLEAN,
-    gender_preference_woman BOOLEAN,
-    gender_man BOOLEAN,
-    gender_woman BOOLEAN,
+    gender varchar(20),
+    gender_preference varchar(20),
     age_min_preference INT,
     age_max_preference INT,
     zipcode varchar(20),

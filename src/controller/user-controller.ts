@@ -112,7 +112,7 @@ export class UserController {
       params.likedProfileUuid
     );
     const likeParams: LikeRecord = {
-      initator_uuid: params.initiatorUuid,
+      initiator_uuid: params.initiatorUuid,
       receiver_uuid: params.likedProfileUuid,
     };
     if (likeRecord) {

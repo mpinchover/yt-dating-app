@@ -3,6 +3,7 @@ import {
   UserRecord,
   DatingMatchPreferencesRecord,
   DatingMatchPreferencesEntity,
+  Gender,
 } from "../types/user";
 
 export const userEntityToRecord = (params: UserEntity): UserRecord => {
@@ -15,7 +16,6 @@ export const userEntityToRecord = (params: UserEntity): UserRecord => {
   };
   return userRecord;
 };
-
 
 export const userRecordToEntity = (params: UserRecord): UserEntity => {
   const userEntity: UserEntity = {
@@ -34,10 +34,8 @@ export const datingMatchPrefRecordToEntity = (
   const datingPrefEntity: DatingMatchPreferencesEntity = {
     uuid: params.uuid,
     userUuid: params.user_uuid,
-    genderPreferenceMan: params.gender_preference_man,
-    genderPreferenceWoman: params.gender_preference_woman,
-    genderMan: params.gender_man,
-    genderWoman: params.gender_woman,
+    genderPreference: Gender[params.gender_preference],
+    gender: Gender[params.gender],
     ageMinPreference: params.age_min_preference,
     ageMaxPreference: params.age_max_preference,
     zipcode: params.zipcode,
