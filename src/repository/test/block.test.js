@@ -38,72 +38,62 @@ describe("block test suite", () => {
   });
 
   it("create a block succesfully", async () => {
-    try {
-      let block = {
-        uuid: "some-uuid",
-        initiator_uuid: "initiator-some-uuid",
-        receiver_uuid: "receiver-some-uuid",
-      };
-      await r.createBlockRecord(block); // create the match
-      let insertedBlocks = await r.getBlockedByUserUuids(
-        block.initiator_uuid,
-        block.receiver_uuid
-      );
+    let block = {
+      uuid: "some-uuid",
+      initiator_uuid: "initiator-some-uuid",
+      receiver_uuid: "receiver-some-uuid",
+    };
+    await r.createBlockRecord(block); // create the match
+    let insertedBlocks = await r.getBlockedByUserUuids(
+      block.initiator_uuid,
+      block.receiver_uuid
+    );
 
-      insertedBlocks.forEach((b) => {
-        expect(block.receiver_uuid).to.equal(b.receiver_uuid);
-        expect(block.initiator_uuid).to.equal(b.initiator_uuid);
-      });
+    insertedBlocks.forEach((b) => {
+      expect(block.receiver_uuid).to.equal(b.receiver_uuid);
+      expect(block.initiator_uuid).to.equal(b.initiator_uuid);
+    });
 
-      insertedBlocks = await r.getBlockedByUserUuids(
-        block.receiver_uuid,
-        block.initiator_uuid
-      );
+    insertedBlocks = await r.getBlockedByUserUuids(
+      block.receiver_uuid,
+      block.initiator_uuid
+    );
 
-      insertedBlocks.forEach((b) => {
-        expect(block.receiver_uuid).to.equal(b.receiver_uuid);
-        expect(block.initiator_uuid).to.equal(b.initiator_uuid);
-      });
-    } catch (e) {
-      console.log(e);
-      throw e;
-    }
+    insertedBlocks.forEach((b) => {
+      expect(block.receiver_uuid).to.equal(b.receiver_uuid);
+      expect(block.initiator_uuid).to.equal(b.initiator_uuid);
+    });
   });
 
   it("get users who blocked this uuid", async () => {
-    try {
-      const userBlockingA = "uuid-1";
-      const userGettingBlockedA = "uuid-2";
-      const userBlockingB = "uuid-3";
-      const userGettingBlockedB = "uuid-4";
-      let block = {
-        uuid: "some-uuid-1",
-        initiator_uuid: userBlockingB,
-        receiver_uuid: userGettingBlockedA,
-      };
-      await r.createBlockRecord(block); // create the match
+    const userBlockingA = "uuid-1";
+    const userGettingBlockedA = "uuid-2";
+    const userBlockingB = "uuid-3";
+    const userGettingBlockedB = "uuid-4";
+    let block = {
+      uuid: "some-uuid-1",
+      initiator_uuid: userBlockingB,
+      receiver_uuid: userGettingBlockedA,
+    };
+    await r.createBlockRecord(block); // create the match
 
-      block = {
-        uuid: "some-uuid-2",
-        initiator_uuid: userBlockingA,
-        receiver_uuid: userGettingBlockedA,
-      };
-      await r.createBlockRecord(block); // create the match
+    block = {
+      uuid: "some-uuid-2",
+      initiator_uuid: userBlockingA,
+      receiver_uuid: userGettingBlockedA,
+    };
+    await r.createBlockRecord(block); // create the match
 
-      let uuids = await r.getUsersWhoBlockedThisUuid(userGettingBlockedA);
-      expect(2).to.equal(uuids.length);
+    let uuids = await r.getUsersWhoBlockedThisUuid(userGettingBlockedA);
+    expect(2).to.equal(uuids.length);
 
-      block = {
-        uuid: "some-uuid-3",
-        initiator_uuid: userBlockingA,
-        receiver_uuid: userGettingBlockedB,
-      };
-      await r.createBlockRecord(block); // create the match
-      uuids = await r.getUsersWhoBlockedThisUuid(userGettingBlockedB);
-      expect(1).to.equal(uuids.length);
-    } catch (e) {
-      console.log(e);
-      throw e;
-    }
+    block = {
+      uuid: "some-uuid-3",
+      initiator_uuid: userBlockingA,
+      receiver_uuid: userGettingBlockedB,
+    };
+    await r.createBlockRecord(block); // create the match
+    uuids = await r.getUsersWhoBlockedThisUuid(userGettingBlockedB);
+    expect(1).to.equal(uuids.length);
   });
 });

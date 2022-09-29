@@ -1,21 +1,9 @@
 #!/bin/sh
 
-ENV=""
-DEV=""
 
-while getopts "td:" OPTION; do
-    case $OPTION in
-    t)
-        ENV=UNIT_TEST
-        ;;
-    d)
-        ENV=DEV
-        ;;
-    esac
-done
-
-export RUNTIME_ENV="UNIT_TEST" 
+export RUNTIME_ENV="INTEGRATION_TEST" 
 export HOST="localhost"
+export PORT="3308"
 
 echo "Starting server with runtime env: " $RUNTIME_ENV
 # docker volume prune -f
@@ -29,15 +17,8 @@ elif [ ! $(docker ps -q -f name=mysql-unit-test) ]; then
     docker run -d --name mysql-unit-test -p 3308:3306 -e MYSQL_ROOT_PASSWORD=test  mysql:8.0.0
     sleep 15
 fi
-# docker rm mysql-unit-test -f
-# wait
-# docker run -d --name mysql-unit-test -p 3308:3306 -e MYSQL_ROOT_PASSWORD=test  mysql:8.0.0
-# sleep 10
+
 
 mysql -uroot -ptest -h 127.0.0.1 -P 3308 --ssl-mode=DISABLED < database/setup-unit-test.sql
 mysql -uroot -ptest -h 127.0.0.1 -P 3308 --ssl-mode=DISABLED --database=test < database/schema.sql 
-npm run test
-
-
-
-# https://github.com/mysqljs/mysql#transactions 
+npm run integration_tests

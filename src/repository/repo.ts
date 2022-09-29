@@ -11,7 +11,7 @@ import { datingMatchPrefRecordToEntity } from "../utils/mapper-user";
 import { VideoEntity, VideoRecord, TrackedVideoRecord } from "../types/video";
 import { injectable, singleton } from "tsyringe";
 import { container } from "tsyringe";
-const MongoClient = require("mongodb").MongoClient;
+var mysql = require("mysql2/promise");
 import "reflect-metadata";
 
 export interface RepoParams {
@@ -23,21 +23,23 @@ export class Repo {
   public db: any;
   public client: any;
 
-  constructor() {
-    // this.setupMongoConnection();
-  }
+  constructor() {}
 
-  setupMongoConnection = async () => {
+  getMySQLConnection = async () => {
+    if (this.db) return;
     try {
-      const uri = "mongodb://127.0.0.1:27020/youtube-dating-app";
-      const client = await MongoClient.connect(uri);
-      this.client = client;
-      this.db = this.client.db;
-      console.log("sucesfully connected to db");
+      const db = await mysql.createConnection({
+        host: process.env.HOST, // "localhost",
+        port: process.env.PORT, // "3308",
+        user: "test",
+        password: "test",
+        database: "test",
+      });
+      this.db = db;
     } catch (e) {
-      console.log("failed to connect to db");
       console.log(e);
       throw e;
+      // todo, fail the entire server code.
     }
   };
 
@@ -48,6 +50,8 @@ export class Repo {
   // http://mongodb.github.io/node-mongodb-native/3.6/api/Cursor.html
   createMatchRecord = async (params: MatchRecord) => {
     try {
+      await this.getMySQLConnection();
+
       await this.db.query("INSERT INTO matches SET ?", params);
     } catch (e) {
       console.log(e);
@@ -64,10 +68,12 @@ export class Repo {
     uuid2: string
   ): Promise<MatchRecord> => {
     try {
+      await this.getMySQLConnection();
+
       const query = `
         SELECT * FROM matches 
         where 
-          (initiator_uuid = ? and responder_uuid = ? or responder_uuid = ? and initiator_uuid = ?) and deleted_at_utc is null `;
+          (initiator_uuid = ? and receiver_uuid = ? or receiver_uuid = ? and initiator_uuid = ?) and deleted_at_utc is null `;
       const [rows, fields] = await this.db.query(query, [
         uuid1,
         uuid2,
@@ -83,6 +89,8 @@ export class Repo {
   };
 
   getMatchRecordByUuid = async (uuid: string): Promise<MatchRecord> => {
+    await this.getMySQLConnection();
+
     const query = `select * from matches where uuid = ? and deleted_at_utc is null`;
     const [rows, fields] = await this.db.query(query, [uuid]);
     if (rows.length == 0) return null;
@@ -90,6 +98,8 @@ export class Repo {
   };
 
   deleteMatchRecord = async (uuid: string) => {
+    await this.getMySQLConnection();
+
     const curTime = new Date();
     const query = "update matches set deleted_at_utc = ? where uuid = ?";
     await this.db.query(query, [curTime, uuid]);
@@ -99,6 +109,8 @@ export class Repo {
     get users matched to this uuid
   */
   getUserUuidsMatchedToUuid = async (uuid: string): Promise<string[]> => {
+    await this.getMySQLConnection();
+
     const query = `select initiator_uuid, responder_uuid from matches
     where (initiator_uuid = ? or responder_uuid = ?) and deleted_at_utc is null group by initiator_uuid, responder_uuid;
       `;
@@ -114,6 +126,8 @@ export class Repo {
   };
 
   createBlockRecord = async (blockRecord: BlockRecord) => {
+    await this.getMySQLConnection();
+
     const query = `insert into blocks set ?`;
     await this.db.query(query, [blockRecord]);
   };
@@ -126,6 +140,8 @@ export class Repo {
     uuid1: string,
     uuid2: string
   ): Promise<BlockRecord> => {
+    await this.getMySQLConnection();
+
     const query = `
     SELECT * FROM blocks 
     where 
@@ -141,6 +157,8 @@ export class Repo {
   };
 
   getUsersWhoBlockedThisUuid = async (uuid: string): Promise<string[]> => {
+    await this.getMySQLConnection();
+
     const query = `SELECT * from blocks where receiver_uuid = ? and deleted_at_utc is null`;
     const [rows, fields] = await this.db.query(query, [uuid]);
     if (rows.length == 0) return null;
@@ -148,6 +166,7 @@ export class Repo {
   };
 
   createLikeRecord = async (params: LikeRecord) => {
+    await this.getMySQLConnection();
     await this.db.query("insert into likes set ? ", [params]);
   };
 
@@ -156,8 +175,10 @@ export class Repo {
     matchParams: MatchRecord
   ) => {
     try {
+      await this.getMySQLConnection();
+
       await this.db.beginTransaction();
-      await this.db.createLikeAndMatchRecords(likeParams, matchParams);
+      await this.createLikeAndMatchRecords(likeParams, matchParams);
       await this.db.commit();
     } catch (e) {
       this.db.rollback();
@@ -169,17 +190,23 @@ export class Repo {
     likeParams: LikeRecord,
     matchParams: MatchRecord
   ) => {
+    await this.getMySQLConnection();
+
     await this.createLikeRecord(likeParams);
     await this.createMatchRecord(matchParams);
   };
 
   createTrackedVideoRecord = async (trackedVideoRecord: TrackedVideoRecord) => {
+    await this.getMySQLConnection();
+
     await this.db.query("insert into tracked_videos set ?", [
       trackedVideoRecord,
     ]);
   };
 
   getVideoByVideoId = async (videoId: string): Promise<VideoRecord> => {
+    await this.getMySQLConnection();
+
     const query = `select * from videos where video_id = ? and deleted_at_utc is null`;
     const [rows, fields] = await this.db.query(query, [videoId]);
     if (rows.length == 0) return null;
@@ -191,6 +218,8 @@ export class Repo {
     trackedVideoRecord: TrackedVideoRecord
   ) => {
     try {
+      await this.getMySQLConnection();
+
       await this.db.beginTransaction();
       await this.createVideoAndTrackedVideoRecords(
         videoRecord,
@@ -207,11 +236,15 @@ export class Repo {
     videoRecord: VideoRecord,
     trackedVideoRecord: TrackedVideoRecord
   ) => {
+    await this.getMySQLConnection();
+
     await this.createVideo(videoRecord);
     await this.createTrackedVideoRecord(trackedVideoRecord);
   };
 
   removeVideo = async (videoUuid: string) => {
+    await this.getMySQLConnection();
+
     const curTime = new Date();
 
     const queryVideos = `update videos set deleted_at_utc = ? where uuid = ?`;
@@ -223,6 +256,8 @@ export class Repo {
 
   removeVideoInTx = async (videoUuid: string) => {
     try {
+      await this.getMySQLConnection();
+
       await this.db.beginTransaction();
       await this.removeVideo(videoUuid);
       await this.db.commit();
@@ -233,6 +268,8 @@ export class Repo {
   };
 
   createVideo = async (videoRecord: VideoRecord) => {
+    await this.getMySQLConnection();
+
     const query = "INSERT INTO videos set ?";
     await this.db.query(query, [videoRecord]);
   };
@@ -244,6 +281,8 @@ export class Repo {
     videoToReplaceUuid: string
   ) => {
     try {
+      await this.getMySQLConnection();
+
       await this.db.beginTransaction();
       await this.swapVideos(
         newTrackedVideoRecordUuid,
@@ -267,6 +306,8 @@ export class Repo {
     incomingVideoUuid: string,
     videoToReplaceUuid: string
   ) => {
+    await this.getMySQLConnection();
+
     // get the ids of the videos you want to replace
     // at this point video should already be created
     const existingTrackedRecord = await this.getTrackedVideoByVideoUuid(
@@ -291,18 +332,22 @@ export class Repo {
   getLikeRecord = async (
     initiatorUuid: string,
     receiverUuid: string
-  ): Promise<LikeRecord> => {
+  ): Promise<LikeRecord> | null => {
+    await this.getMySQLConnection();
+
     const query = `select * from likes where initiator_uuid = ? and receiver_uuid = ?`;
     const [rows, fields] = await this.db.query(query, [
       initiatorUuid,
       receiverUuid,
     ]);
-    if (rows.legnth == 0) return null;
+    if (rows.length == 0) return null;
     return rows[0];
   };
 
   _createUser = async (params: UserRecord) => {
     try {
+      await this.getMySQLConnection();
+
       await this.db.query("INSERT INTO users SET ?", params);
     } catch (e) {
       console.log(e);
@@ -313,6 +358,8 @@ export class Repo {
   createUser = async (params: UserRecord) => {
     // await this.db.collection("users").insertOne(params);
     try {
+      await this.getMySQLConnection();
+
       await this._createUser(params);
     } catch (e) {
       console.log(e);
@@ -321,6 +368,8 @@ export class Repo {
   };
 
   deleteUserByUuid = async (uuid: string) => {
+    await this.getMySQLConnection();
+
     const user: UserRecord = await this.getUserByUUID(uuid);
     if (!user) throw new Error("user does not exist");
     const curTime = new Date();
@@ -334,16 +383,36 @@ export class Repo {
 
   getUserByUUID = async (uuid: string): Promise<UserRecord> => {
     try {
+      await this.getMySQLConnection();
       const [rows, fields] = await this.db.query(
-        "SELECT * FROM users where uuid = ? and deleted_at_utc is null",
+        "SELECT * FROM users where uuid = ? ",
         [uuid]
       );
       if (rows.length == 0) return null;
+      const videos = await this.getVideosByUserUuid(uuid);
+      const dmp = await this.getDatingPreferencesByUserUuid(uuid);
+      rows[0].videos = videos;
+      rows[0].dating_preference = dmp;
       return rows[0];
     } catch (e) {
-      console.log("ERROR: " + e);
       throw e;
     }
+  };
+
+  getVideosByUserUuid = async (
+    userUuid: string
+  ): Promise<VideoRecord[] | null> => {
+    await this.getMySQLConnection();
+
+    const [rows, fields] = await this.db.query(
+      `SELECT v.* FROM videos v
+      join tracked_videos tv on v.uuid = tv.video_uuid
+      join users u on u.uuid = tv.user_uuid and u.uuid = ?
+       `,
+      [userUuid]
+    );
+    if (rows.length == 0) return null;
+    return rows;
   };
 
   /*
@@ -352,6 +421,8 @@ export class Repo {
   getTrackedVideosByUserUuids = async (
     userUuids: string[]
   ): Promise<TrackedVideoRecord[]> => {
+    await this.getMySQLConnection();
+
     const records: TrackedVideoRecord[] = [];
 
     const query =
@@ -364,6 +435,8 @@ export class Repo {
   getTrackedVideoByVideoUuid = async (
     videoUuid: string
   ): Promise<TrackedVideoRecord> => {
+    await this.getMySQLConnection();
+
     const query =
       "select * from tracked_videos where video_uuid = ? and deleted_at_utc is null";
     const [rows, fields] = await this.db.query(query, [videoUuid]);
@@ -372,6 +445,8 @@ export class Repo {
   };
 
   getVideoByUuid = async (uuid: string): Promise<VideoRecord> => {
+    await this.getMySQLConnection();
+
     const query = "select * from videos where uuid = ?";
     const [rows, fields] = await this.db.query(query, [uuid]);
     if (rows.length == 0) return null;
@@ -379,6 +454,8 @@ export class Repo {
   };
 
   getVideosByUuids = async (uuids: string[]): Promise<VideoRecord[]> => {
+    await this.getMySQLConnection();
+
     const query = "select * from videos where uuid in (?)";
     const [rows, fields] = await this.db.query(query, [uuids]);
     if (rows.length == 0) return null;
@@ -391,61 +468,63 @@ export class Repo {
   getUsersForMatching = async (
     filters: UserSearchFilter
   ): Promise<UserRecord[]> => {
+    await this.getMySQLConnection();
+
     let {
-      gender, // what gender I am
-      genderPreference, // what my gender preference is
-      ageMinPreference, // what my age min preference is
-      ageMaxPreference,
+      gender, // what gender the user should be
+      genderPreference, // what their gender pference shoudl be
+      ageMin, // what their age min should be
+      ageMax, // what their age Max should be
       age, // what my age is
       userUuidsToFilterOut,
     } = filters;
 
-    // if i'm a man, i want someone looking for a man or men and women
-    let genderSearchQuery;
+    // what their gender should be.
+    let userGenderShouldBe;
     if (gender === Gender.MAN) {
-      genderSearchQuery = [Gender[Gender.MAN], Gender[Gender.BOTH]];
+      userGenderShouldBe = [Gender[Gender.MAN]];
     } else if (gender == Gender.WOMAN) {
-      genderSearchQuery = [Gender[Gender.WOMAN], Gender[Gender.BOTH]];
+      userGenderShouldBe = [Gender[Gender.WOMAN]];
     } else {
       throw new Error("invalid selection for gender search query");
     }
 
-    // if i'm open to men and women, i want someone who identifies as either
-    let genderPrefSearchQuery;
-    if (genderPreference === Gender.MAN || genderPreference === Gender.WOMAN) {
-      genderPrefSearchQuery = [Gender[genderPreference]];
-    } else if (genderPreference === Gender.BOTH) {
-      genderPrefSearchQuery = [Gender[Gender.MAN], Gender[Gender.WOMAN]];
+    // what their gender pref should be
+    let userGenderPrefShouldBe;
+    if (genderPreference === Gender.MAN) {
+      userGenderPrefShouldBe = [Gender[Gender.MAN], Gender[Gender.BOTH]];
+    } else if (genderPreference === Gender.WOMAN) {
+      userGenderPrefShouldBe = [Gender[Gender.WOMAN], Gender[Gender.BOTH]];
     } else {
       throw new Error("invalid selection for gender preference");
     }
 
     if (!userUuidsToFilterOut) userUuidsToFilterOut = ["garbage"];
-
     let query = `
-    select u.* from users u
+    select u.* from users u 
     join dating_match_preferences dmp on
-      dmp.gender in (?) and
+      dmp.gender in (?) and 
       dmp.gender_preference in (?) and
-      dmp.age <=  ? and
       dmp.age >= ? and
+      dmp.age <= ? and
       dmp.age_max_preference >= ? and
-      dmp.age_min_preference <= ? and 
-      dmp.deleted_at_utc is null and
+      dmp.age_min_preference <= ? and
       dmp.user_uuid = u.uuid
-    where u.uuid not in (?) and 
-    u.verified = true and u.deleted_at_utc is null `;
+    where u.uuid not in (?) and
+    u.verified = true and u.deleted_at_utc is null
+    `;
 
     // need to do some processing on the gender
     let [rows, fields] = await this.db.query(query, [
-      genderPrefSearchQuery, // their gender matches my gender preference
-      genderSearchQuery, // my gender is in their gender preferences
-      ageMaxPreference,
-      ageMinPreference,
+      userGenderShouldBe, // their gender matches my gender preference
+      userGenderPrefShouldBe, // my gender is in their gender preferences
+      ageMin,
+      ageMax,
       age,
       age,
       userUuidsToFilterOut,
     ]);
+
     if (rows.length == 0) return null;
 
     const userUuids = rows.map((user) => user.uuid);
@@ -486,6 +565,8 @@ export class Repo {
   getDatingPreferencesByUserUuid = async (
     userUuid: string
   ): Promise<DatingMatchPreferencesEntity> => {
+    await this.getMySQLConnection();
+
     const query = "select * from dating_match_preferences where user_uuid = ?";
     const [rows, fields] = await this.db.query(query, [userUuid]);
     if (rows.length == 0) return null;
@@ -495,6 +576,8 @@ export class Repo {
   createDatingPreferencesRecord = async (
     params: DatingMatchPreferencesRecord
   ) => {
+    await this.getMySQLConnection();
+
     const query = "insert into dating_match_preferences set ?";
     await this.db.query(query, [params]);
   };

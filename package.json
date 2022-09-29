@@ -7,9 +7,8 @@
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell && tsc --watch",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log",
     "test": "TS_NODE_PROJECT=\"tsconfig.testing.json\" mocha -r ts-node/register src/**/*.test.js src/**/*.test.ts -- --runInBand",
-    "testv2": "./scripts/test.sh"
+    "integration_tests": "TS_NODE_PROJECT=\"tsconfig.testing.json\" mocha -r ts-node/register integration-tests/**/*.test.ts -- --runInBand"
   },
   "engines": {
     "node": "16"

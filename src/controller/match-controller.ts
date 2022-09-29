@@ -1,23 +1,32 @@
-import { UserEntity, DatingMatchPreferencesEntity } from "../types/user";
 import {
-  UserMatchingItemEntity,
-  UserProfileSearchFilterRecord,
-} from "../types/match";
+  UserEntity,
+  DatingMatchPreferencesEntity,
+  UserSearchFilter,
+} from "../types/user";
+import { UserMatchingItemEntity } from "../types/match";
 import { VideoEntity } from "../types/video";
 import { Repo } from "../repository/repo";
 import levenshtein from "fast-levenshtein";
-import { userRecordConstructor } from "firebase-functions/v1/auth";
+// import { userRecordConstructor } from "firebase-functions/v1/auth";
+import { injectable, container } from "tsyringe";
+import { v4 as uuidv4 } from "uuid";
 
-export interface MatchControllerParams {
+@injectable()
+export class MatchController {
   repo: Repo;
-}
 
-class MatchController {
-  repo: Repo;
-
-  constructor(p: MatchControllerParams) {
-    this.repo = p.repo;
+  constructor() {
+    this.repo = container.resolve(Repo);
   }
+
+  getMatchByUuids = async (params: any) => {
+    return await this.repo.getMatchRecordByUuids(params.uuid1, params.uuid2);
+  };
+
+  getLike = async (initiatorUuid, receiverUuid: string) => {
+    const like = await this.repo.getLikeRecord(initiatorUuid, receiverUuid);
+    return like;
+  };
 
   getCandidatesForUser = async (user: UserEntity) => {
     let candidateMatchingItems = await this.getCandidateMatchingItems(user);
@@ -58,7 +67,7 @@ class MatchController {
   generateUserMatchingItem = (user: UserEntity): UserMatchingItemEntity => {
     const res: UserMatchingItemEntity = {
       userUuid: user.uuid,
-      videoEntities: user.videoEntities,
+      videoEntities: user.videos,
     };
     return res;
   };
@@ -81,15 +90,18 @@ class MatchController {
       ...blockedByUserUUIDs,
     ];
 
-    const uDatingPref = await this.repo.getDatingPreferencesByUuid(user.uuid);
-    user.userDatingPreference = uDatingPref;
-    const searchFilter: UserProfileSearchFilterRecord = this.createSearchFilter(
+    const uDatingPref = await this.repo.getDatingPreferencesByUserUuid(
+      user.uuid
+    );
+    user.datingPreference = uDatingPref;
+    const searchFilter: UserSearchFilter = this.createSearchFilter(
       user,
       userUUIDsToFilterOut
     );
 
-    const candidateProfiles: UserEntity[] =
-      await this.repo.getUserProfileEntities(searchFilter);
+    const candidateProfiles: UserEntity[] = await this.repo.getUsersForMatching(
+      searchFilter
+    );
 
     const candidateMatchingItems: UserMatchingItemEntity[] = [];
     for (const candidateProfile of candidateProfiles) {
@@ -102,13 +114,13 @@ class MatchController {
   createSearchFilter = (
     user: UserEntity,
     userUuidsToFilterOut: string[]
-  ): UserProfileSearchFilterRecord => {
-    const filter: UserProfileSearchFilterRecord = {
-      gender: user.userDatingPreference.gender,
-      genderPreference: user.userDatingPreference.genderPreference,
-      age: user.userDatingPreference.age,
-      ageMinPreference: user.userDatingPreference.ageMinPreference,
-      ageMaxPreference: user.userDatingPreference.ageMaxPreference,
+  ): UserSearchFilter => {
+    const filter: UserSearchFilter = {
+      gender: user.datingPreference.gender,
+      genderPreference: user.datingPreference.genderPreference,
+      age: user.datingPreference.age,
+      ageMin: user.datingPreference.ageMinPreference,
+      ageMax: user.datingPreference.ageMaxPreference,
       userUuidsToFilterOut: userUuidsToFilterOut,
     };
     return filter;
@@ -266,8 +278,8 @@ class MatchController {
   };
 
   getAllTextDescriptionFromVideoEntity = (video: VideoEntity): string => {
-    if (!video.description || video.description === "") return "";
-    const description = video.description.toLowerCase();
+    if (!video.videoDescription || video.videoDescription === "") return "";
+    const description = video.videoDescription.toLowerCase();
     return description;
   };
 
@@ -378,8 +390,8 @@ class MatchController {
     for (let i = 0; i < matchingItem.videoEntities.length; i++) {
       const videoEntity = matchingItem.videoEntities[i];
 
-      videoEntity.description = this.sanitizeMatchingItemText(
-        videoEntity.description.split(" ")
+      videoEntity.videoDescription = this.sanitizeMatchingItemText(
+        videoEntity.videoDescription.split(" ")
       );
       videoEntity.videoTitle = this.sanitizeMatchingItemText(
         videoEntity.videoTitle.split(" ")

@@ -22,7 +22,7 @@ export interface VideoEntity {
   videoId?: string;
   channelId?: string;
   videoTitle?: string;
-  description?: string;
+  videoDescription?: string;
   categoryId?: number;
   topicCategories?: string[];
 }

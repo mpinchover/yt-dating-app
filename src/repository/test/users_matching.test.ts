@@ -7,6 +7,7 @@ import {
   // UserSearchFilter,
   Gender,
 } from "../../types/user";
+import { v4 as uuidv4 } from "uuid";
 
 const { Repo } = require("../repo");
 var mysql = require("mysql2/promise");
@@ -46,45 +47,63 @@ describe("get matching users test suite", () => {
   });
 
   it("get the matching users", async () => {
-    const kelly = getUser();
+    const kelly = getUser("WOMAN", "MAN", 30);
+    const jake = getUser("MAN", "WOMAN", 30);
+    const marissa = getUser("WOMAN", "MAN", 30);
+    const olderWomanOutsideOfRange = getUser("WOMAN", "MAN", 65);
+    const youngerWomanOutsideOfRange = getUser("WOMAN", "MAN", 20);
+    const biWoman = getUser("WOMAN", "BOTH", 30);
 
-    await r.createUser(kelly.user);
-    await r.createVideo(kelly.videos[0]); // todo create a batch create videos
-
-    const trackedVid = {
-      uuid: "kelly-tracked-vid-1",
-      user_uuid: kelly.user.uuid,
-      video_uuid: kelly.videos[0].uuid,
-    };
-    await r.createTrackedVideoRecord(trackedVid);
-    await r.createDatingPreferencesRecord(kelly.datingMatchPreferences);
+    await createUserInDB(r, kelly);
+    await createUserInDB(r, jake);
+    await createUserInDB(r, marissa);
+    await createUserInDB(r, olderWomanOutsideOfRange);
+    await createUserInDB(r, youngerWomanOutsideOfRange);
+    await createUserInDB(r, biWoman);
 
     const filter = {
-      gender: Gender.MAN, // I am a man
-      genderPreference: Gender.WOMAN, // lloking for a woman
-      age: 32, // my age
-      ageMinPreference: 20, // their age min pref
-      ageMaxPreference: 60, // their age max pref
+      gender: Gender.WOMAN, // should be their gender
+      genderPreference: Gender.MAN, // lloking for a woman
+      ageMin: 22, // what their age min should be
+      ageMax: 60, // what their age max should be
+      age: 43, // my age, so you can make sure their min and max ages prefs are in this range.
     };
     const matchingUsers = await r.getUsersForMatching(filter);
 
     expect(matchingUsers).to.not.be.null;
-    expect(matchingUsers.length).to.equal(1);
+    expect(matchingUsers.length).to.equal(3);
     expect(matchingUsers[0].videos.length).to.equal(1);
   });
 });
 
-const getUser = () => {
+const createUserInDB = async (r, item) => {
+  await r.createUser(item.user);
+  await r.createVideo(item.videos[0]); // todo create a batch create videos
+
+  const trackedVid = {
+    uuid: `${item.user.uuid}-vid`,
+    user_uuid: item.user.uuid,
+    video_uuid: item.videos[0].uuid,
+  };
+  await r.createTrackedVideoRecord(trackedVid);
+  await r.createDatingPreferencesRecord(item.datingMatchPreferences);
+};
+
+const getUser = (gender, genderPref, age) => {
+  const userUuid = uuidv4();
+  const videoUuid = uuidv4();
+  const dmpUuid = uuidv4();
+
   return {
     user: {
-      uuid: "user-uuid",
+      uuid: userUuid,
       mobile: "8607664545",
       email: "test@gmail.com",
       verified: true,
     },
     videos: [
       {
-        uuid: "video-uuid-1",
+        uuid: videoUuid,
         video_id: "video-id-1",
         channel_id: "channel-id-1",
         video_title: "video-title-1",
@@ -94,15 +113,15 @@ const getUser = () => {
       },
     ],
     datingMatchPreferences: {
-      uuid: "dmp-uuid",
-      user_uuid: "user-uuid",
-      gender: "WOMAN",
-      gender_preference: "MAN",
+      uuid: dmpUuid,
+      user_uuid: userUuid,
+      gender: gender,
+      gender_preference: genderPref,
       age_min_preference: 20,
       age_max_preference: 50,
       zipcode: "06117",
       zipcode_preference: "11217",
-      age: 40,
+      age: age,
     },
   };
 };

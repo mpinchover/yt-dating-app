@@ -72,11 +72,11 @@ export interface UserEntity {
 }
 
 export interface UserSearchFilter {
-  genderMan: boolean;
-  gender: Gender;
-  genderPreference: Gender;
-  age: number;
-  ageMinPreference: number;
-  ageMaxPreference: number;
-  userUuidsToFilterOut: string[];
+  genderMan?: boolean;
+  gender?: Gender;
+  genderPreference?: Gender;
+  age?: number;
+  ageMin?: number;
+  ageMax?: number;
+  userUuidsToFilterOut?: string[];
 }
