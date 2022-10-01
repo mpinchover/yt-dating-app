@@ -17,9 +17,8 @@ export class AWSGateway {
   }
 
   buildS3ImageUploadObject = (params: uploadImageToAWSParams) => {
-    const { userUuid, bufferBase64 } = params;
-    const uuid = uuidv4();
-    const key = `public/users/${userUuid}/profile_pictures/${uuid}`;
+    const { bufferBase64, key } = params;
+    const uuid = params.newImageUuid;
     const data = {
       key,
       Body: bufferBase64,
@@ -44,6 +43,8 @@ export class AWSGateway {
 export interface uploadImageToAWSParams {
   userUuid: string;
   bufferBase64: string;
+  newImageUuid: string;
+  key: string;
 }
 
 /*

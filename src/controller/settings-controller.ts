@@ -169,9 +169,21 @@ export class SettingsController {
     // - make sure all params are present
     // upload an image
 
+    const { userUuid, bufferBase64 } = params;
+    const newImageUuid = uuidv4();
     let mediaStorageLink;
+    const key = `public/users/${userUuid}/profile_pictures/${newImageUuid}`;
+
+    const uploadImageParams = {
+      userUuid,
+      newImageUuid,
+      bufferBase64,
+      key,
+    };
     try {
-      mediaStorageLink = await this.awsGateway.uploadImageToAWS(params);
+      mediaStorageLink = await this.awsGateway.uploadImageToAWS(
+        uploadImageParams
+      );
     } catch (e) {
       throw new Error(`failed to upload image to s3, ${e.message}`);
     }
