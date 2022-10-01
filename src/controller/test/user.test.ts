@@ -268,7 +268,7 @@ describe("user testing suite", () => {
       },
     };
 
-    userController = new UserController();
+    const userController = new UserController();
     userController.repo = test.mockRepo;
 
     await expect(userController.likeUser({})).to.be.rejectedWith(Error);
@@ -285,7 +285,7 @@ describe("user testing suite", () => {
       },
     };
 
-    userController = new UserController();
+    const userController = new UserController();
     userController.repo = test.mockRepo;
 
     await expect(userController.likeUser({})).to.be.rejectedWith(Error);
