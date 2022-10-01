@@ -50,20 +50,20 @@ describe("match test suite", () => {
     const match = {
       uuid: "some-uuid",
       initiator_uuid: "in-some-uuid",
-      responder_uuid: "re-some-uuid",
+      receiver_uuid: "re-some-uuid",
     };
     await r.createMatchRecord(match); // create the match
 
     let insertedMatch = await r.getMatchRecordByUuid(match.uuid);
     expect(match.initiator_uuid).to.equal(insertedMatch.initiator_uuid);
-    expect(match.responder_uuid).to.equal(insertedMatch.responder_uuid);
+    expect(match.receiver_uuid).to.equal(insertedMatch.receiver_uuid);
 
     insertedMatch = await r.getMatchRecordByUuids(
       match.initiator_uuid,
-      match.responder_uuid
+      match.receiver_uuid
     );
     expect(match.initiator_uuid).to.equal(insertedMatch.initiator_uuid);
-    expect(match.responder_uuid).to.equal(insertedMatch.responder_uuid);
+    expect(match.receiver_uuid).to.equal(insertedMatch.receiver_uuid);
 
     insertedMatch = await r.getMatchRecordByUuids(
       match.initiator_uuid,
@@ -77,7 +77,7 @@ describe("match test suite", () => {
     expect(null).to.eql(insertedMatch);
     insertedMatch = await r.getMatchRecordByUuids(
       match.initiator_uuid,
-      match.responder_uuid
+      match.receiver_uuid
     );
     expect(null).to.eql(insertedMatch);
   });
@@ -87,7 +87,7 @@ describe("match test suite", () => {
     let match = {
       uuid: "some-uuid-1",
       initiator_uuid: userUuid,
-      responder_uuid: "re-uuid-",
+      receiver_uuid: "re-uuid-",
     };
     await r.createMatchRecord(match); // create the match
     let insertedMatchedRecord = await r.getMatchRecordByUuid(match.uuid);
@@ -95,8 +95,8 @@ describe("match test suite", () => {
 
     match = {
       uuid: "some-uuid-2",
-      responder_uuid: userUuid,
-      initiator_uuid: "responder-uuid-3",
+      receiver_uuid: userUuid,
+      initiator_uuid: "receiver-uuid-3",
     };
     await r.createMatchRecord(match); // create the match
     insertedMatchedRecord = await r.getMatchRecordByUuid(match.uuid);
@@ -104,7 +104,7 @@ describe("match test suite", () => {
 
     match = {
       uuid: "some-uuid-3",
-      responder_uuid: "in-some-uuid-4",
+      receiver_uuid: "in-some-uuid-4",
       initiator_uuid: "res-some-uuid-5",
     };
 

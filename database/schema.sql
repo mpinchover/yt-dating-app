@@ -11,6 +11,18 @@ CREATE TABLE users (
     UNIQUE KEY unique_uuid (uuid)
 );
 
+DROP TABLE IF EXISTS images;
+CREATE TABLE images (
+    id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    uuid varchar(50) NOT NULL,
+    media_storage_link varchar(100) NOT NULL,
+    user_uuid varchar(50) NOT NULL,
+    position_index INT NOT NULL,
+    deleted_at_utc DATETIME,
+    created_at_utc DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_uuid (uuid)
+);
+
 DROP TABLE IF EXISTS videos;
 CREATE TABLE videos (
     id int NOT NULL AUTO_INCREMENT PRIMARY KEY,

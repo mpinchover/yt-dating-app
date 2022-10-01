@@ -6,6 +6,7 @@ import {
   UserSearchFilter,
   Gender,
 } from "../types/user";
+import { ImageRecord } from "../types/image";
 import { MatchRecord, BlockRecord, LikeRecord } from "../types/match";
 import { datingMatchPrefRecordToEntity } from "../utils/mapper-user";
 import { VideoEntity, VideoRecord, TrackedVideoRecord } from "../types/video";
@@ -111,8 +112,8 @@ export class Repo {
   getUserUuidsMatchedToUuid = async (uuid: string): Promise<string[]> => {
     await this.getMySQLConnection();
 
-    const query = `select initiator_uuid, responder_uuid from matches
-    where (initiator_uuid = ? or responder_uuid = ?) and deleted_at_utc is null group by initiator_uuid, responder_uuid;
+    const query = `select initiator_uuid, receiver_uuid from matches
+    where (initiator_uuid = ? or receiver_uuid = ?) and deleted_at_utc is null group by initiator_uuid, receiver_uuid;
       `;
     const [rows, fields] = await this.db.query(query, [uuid, uuid]);
     if (rows.length == 0) return null;
@@ -120,7 +121,7 @@ export class Repo {
     const results: string[] = [];
     rows.forEach((doc) => {
       if (doc.initiator_uuid != uuid) results.push(doc.initiator_uuid);
-      else results.push(doc.responder_uuid);
+      else results.push(doc.receiver_uuid);
     });
     return results;
   };
@@ -581,8 +582,51 @@ export class Repo {
     const query = "insert into dating_match_preferences set ?";
     await this.db.query(query, [params]);
   };
-}
 
+  // need a way to flag inapprorpiate images, consider adding a status to the image schema
+  // TODO – unit tests for all of these
+  createImage = async (params: ImageRecord) => {
+    await this.getMySQLConnection();
+
+    const query = "insert into images set ?";
+    await this.db.query(query, [params]);
+  };
+
+  updateImage = async (params: ImageRecord) => {
+    await this.getMySQLConnection();
+
+    const query = "update images set ? where uuid = ?";
+    await this.db.query(query, [params, params.uuid]);
+  };
+
+  // need to check if the image for this index already exists
+  getImageByIndexAndUserUuid = async (
+    positionIndex: number,
+    userUuid: string
+  ): Promise<ImageRecord | null> => {
+    await this.getMySQLConnection();
+
+    const query =
+      "select * from images where user_uuid = ? and position_index = ? and deleted_at_utc is null";
+
+    const [rows, fields] = await this.db.query(query, [
+      userUuid,
+      positionIndex,
+    ]);
+    if (rows.length == 0) return null;
+    return rows[0];
+  };
+
+  getImagesByUserUuid = async (uuid: string): Promise<ImageRecord[] | null> => {
+    await this.getMySQLConnection();
+    const query =
+      "select * from images where user_uuid = ? and deleted_at_utc is null";
+
+    const [rows, fields] = await this.db.query(query, [uuid]);
+    if (rows.length == 0) return null;
+    return rows;
+  };
+}
 /*
 https://levelup.gitconnected.com/dependency-injection-in-typescript-2f66912d143c
 */

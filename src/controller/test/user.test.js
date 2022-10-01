@@ -51,7 +51,7 @@ describe("user testing suite", () => {
     userController.youtubeGateway = test.mockYoutubeGateway;
 
     await expect(
-      userController.createVideoAndTrackedVideo(test.params)
+      userController.createVideo(test.params)
     ).to.not.be.rejectedWith();
 
     expect(userController.repo.createTrackedVideoRecord.callCount).to.equal(
@@ -106,7 +106,7 @@ describe("user testing suite", () => {
     userController.youtubeGateway = test.mockYoutubeGateway;
 
     await expect(
-      userController.createVideoAndTrackedVideo(test.params)
+      userController.createVideo(test.params)
     ).to.not.be.rejectedWith();
 
     expect(userController.repo.createTrackedVideoRecord.callCount).to.equal(
@@ -122,13 +122,10 @@ describe("user testing suite", () => {
       userController.youtubeGateway.getYoutubeDetailsByVideoId.callCount
     ).to.equal(test.getYoutubeDetailsByVideoIdCallCount);
 
-    const newTrackedVideoParams = {
-      video_uuid: videoUuid,
-      user_uuid: test.params.userUuid,
-    };
-    expect(test.mockRepo.createTrackedVideoRecord).to.have.been.calledWith(
-      newTrackedVideoParams
-    );
+    // const createTrackedVideoRecordArgs =
+    //   test.mockRepo.createTrackedVideoRecord.args[0][0];
+    // expect(createTrackedVideoRecordArgs.video_uuid).equal(videoUuid);
+    // expect(createTrackedVideoRecordArgs.user_uuid).equal(userUuid);
 
     const [trackedVideoInput] =
       test.mockRepo.createTrackedVideoRecord.firstCall.args;
@@ -139,12 +136,12 @@ describe("user testing suite", () => {
 
   it("test likeUser, create a like", async () => {
     const initiatorUuid = "init-uuid";
-    const likedProfileUuid = "liked-profile-uuid";
+    const receiverUuid = "liked-profile-uuid";
 
     let test = {
       name: "no previous like found; just make a like",
       initiatorUuid,
-      likedProfileUuid,
+      receiverUuid,
       mockRepo: {
         getMatchRecordByUuids: sinon.stub().returns(null),
         getBlockedByUserUuids: sinon.stub().returns(null),
@@ -164,7 +161,7 @@ describe("user testing suite", () => {
     await expect(
       userController.likeUser({
         initiatorUuid,
-        likedProfileUuid,
+        receiverUuid,
       })
     ).to.not.be.rejectedWith();
 
@@ -195,17 +192,17 @@ describe("user testing suite", () => {
 
   it("test likeUser, create like and match (createLikeAndMatchRecordInTx)", async () => {
     const initiatorUuid = "init-uuid";
-    const likedProfileUuid = "liked-profile-uuid";
+    const receiverUuid = "liked-profile-uuid";
 
     let test = {
       name: "previous like found; create like and match",
       initiatorUuid,
-      likedProfileUuid,
+      receiverUuid,
       mockRepo: {
         getMatchRecordByUuids: sinon.stub().returns(null),
         getBlockedByUserUuids: sinon.stub().returns(null),
         getLikeRecord: sinon.stub().returns({
-          initiator_uuid: likedProfileUuid,
+          initiator_uuid: receiverUuid,
           receiver_uuid: initiatorUuid,
         }),
         createLikeRecord: sinon.stub().returns(null),
@@ -223,7 +220,7 @@ describe("user testing suite", () => {
     await expect(
       userController.likeUser({
         initiatorUuid,
-        likedProfileUuid,
+        receiverUuid,
       })
     ).to.not.be.rejectedWith();
 
@@ -246,20 +243,14 @@ describe("user testing suite", () => {
       test.name
     );
 
-    const newLikeParams = {
-      receiver_uuid: test.likedProfileUuid,
-      initiator_uuid: test.initiatorUuid,
-    };
+    const [createLikeParams, createMatchParams] =
+      test.mockRepo.createLikeAndMatchRecordInTx.firstCall.args;
 
-    const newMatchParams = {
-      initiator_uuid: test.likedProfileUuid,
-      responder_uuid: test.initiatorUuid,
-    };
+    expect(createLikeParams.receiver_uuid).equal(receiverUuid);
+    expect(createLikeParams.initiator_uuid).equal(initiatorUuid);
 
-    expect(test.mockRepo.createLikeAndMatchRecordInTx).to.have.been.calledWith(
-      newLikeParams,
-      newMatchParams
-    );
+    expect(createMatchParams.receiver_uuid).equal(initiatorUuid);
+    expect(createMatchParams.initiator_uuid).equal(receiverUuid);
 
     expect(test.mockRepo.createLikeAndMatchRecordInTx.callCount).to.equal(
       test.createLikeAndMatchRecordInTxCount,
@@ -271,7 +262,7 @@ describe("user testing suite", () => {
     const test = {
       name: "match found, throw an error",
       initiatorUuid: "init-uuid",
-      likedProfileUuid: "liked-profile-uuid",
+      receiverUuid: "liked-profile-uuid",
       mockRepo: {
         getMatchRecordByUuids: sinon.stub().returns({}),
       },
@@ -287,7 +278,7 @@ describe("user testing suite", () => {
     const test = {
       name: "block found, throw an error",
       initiatorUuid: "init-uuid",
-      likedProfileUuid: "liked-profile-uuid",
+      receiverUuid: "liked-profile-uuid",
       mockRepo: {
         getMatchRecordByUuids: sinon.stub().returns(null),
         getBlockedByUserUuids: sinon.stub().returns({}),

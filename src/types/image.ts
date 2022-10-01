@@ -2,7 +2,16 @@ export interface ImageRecord {
   deleted_at_utc?: Date;
   created_at_utc?: Date; // can default in DB
   updated_at_utc?: Date;
-  
-  media_link: string;
-  upload_status: string;
+
+  uuid: string;
+  user_uuid: string;
+  media_storage_link: string;
+  position_index: number;
+}
+
+export interface ImageEntity {
+  uuid: string;
+  userUuid: string;
+  mediaStorageLink: string;
+  positionIndex: number;
 }

@@ -22,10 +22,10 @@ export interface DatingMatchPreferencesRecord {
 
   uuid?: string;
   user_uuid?: string;
-  gender: string;
-  gender_preference: string;
-  age_min_preference: number;
-  age_max_preference: number;
+  gender?: string;
+  gender_preference?: string;
+  age_min_preference?: number;
+  age_max_preference?: number;
   zipcode?: string;
   zipcode_preference?: string;
   age?: number;
@@ -34,8 +34,8 @@ export interface DatingMatchPreferencesRecord {
 export interface DatingMatchPreferencesEntity {
   uuid?: string;
   userUuid?: string;
-  gender: Gender;
-  genderPreference: Gender;
+  gender?: Gender;
+  genderPreference?: Gender;
   ageMinPreference?: number;
   ageMaxPreference?: number;
   zipcode?: string;

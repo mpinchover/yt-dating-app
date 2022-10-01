@@ -64,7 +64,7 @@ describe("like test suite", () => {
     let match = {
       uuid: "some-uuid-2",
       initiator_uuid: initiatorUuid,
-      responder_uuid: receiverUuid,
+      receiver_uuid: receiverUuid,
     };
 
     await r.createLikeAndMatchRecords(like, match);
@@ -78,6 +78,6 @@ describe("like test suite", () => {
 
     const insertedMatch = await r.getMatchRecordByUuid(match.uuid);
     expect(match.initiator_uuid).to.equal(insertedMatch.initiator_uuid);
-    expect(match.responder_uuid).to.equal(insertedMatch.responder_uuid);
+    expect(match.receiver_uuid).to.equal(insertedMatch.receiver_uuid);
   });
 });

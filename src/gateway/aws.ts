@@ -1,16 +1,22 @@
 import * as AWS from "aws-sdk";
 import { v4 as uuidv4 } from "uuid";
-import { injectable } from "tsyringe";
+import { injectable, singleton } from "tsyringe";
 export interface AWSGatewayParams {
   s3: any;
 }
 
-@injectable()
+@singleton()
 export class AWSGateway {
   s3: any;
-  constructor() {}
+  constructor() {
+    this.s3 = new AWS.S3({
+      region: process.env.BUCKET_REGION,
+      accessKeyId: process.env.ACCESS_KEY_ID,
+      secretAccessKey: process.env.BUCKET_SECRET_ACCESS_KEY,
+    });
+  }
 
-  buildS3ImageUploadObject = (params: uploadPictureToAWSParams) => {
+  buildS3ImageUploadObject = (params: uploadImageToAWSParams) => {
     const { userUuid, bufferBase64 } = params;
     const uuid = uuidv4();
     const key = `public/users/${userUuid}/profile_pictures/${uuid}`;
@@ -19,17 +25,23 @@ export class AWSGateway {
       Body: bufferBase64,
       ContentEncoding: "base64",
       ContentType: "image/jpeg",
+      Bucket: process.env.BUCKET_NAME,
     };
     return data;
   };
 
-  uploadPictureToAWS = async (params: uploadPictureToAWSParams) => {
+  // need to formate the key to return correct link
+  uploadImageToAWS = async (
+    params: uploadImageToAWSParams
+  ): Promise<string> => {
     const uploadObject = this.buildS3ImageUploadObject(params);
     await this.s3.putObject(uploadObject).Promise();
+    const { key } = uploadObject;
+    return key;
   };
 }
 
-export interface uploadPictureToAWSParams {
+export interface uploadImageToAWSParams {
   userUuid: string;
   bufferBase64: string;
 }
