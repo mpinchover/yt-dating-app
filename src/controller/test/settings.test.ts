@@ -16,11 +16,15 @@ describe("settings testing suite", () => {
     settingsController = new SettingsController();
   });
 
+  // TODO - see if there's a way to test the key value as well as the media link
   it("create image, image doesn't exist yet", async () => {
-    const mediaStorageLink = "media-storage-link";
+    const expectedMediaStorageKey = "media-storage-key";
+    const expectedUserUuid = "user-uuid";
+    const expectedPositionIndex = 0;
+    const expectedBufferBase64 = "buffer-base-64";
 
     const mockAwsGateway = {
-      uploadImageToAWS: sinon.stub().returns(mediaStorageLink),
+      uploadImageToAWS: sinon.stub().returns(null),
     };
 
     const mockRepo = {
@@ -32,29 +36,29 @@ describe("settings testing suite", () => {
     settingsController.awsGateway = mockAwsGateway;
     settingsController.repo = mockRepo;
 
-    const userUuid = "user-uuid";
-    const positionIndex = 0;
     const uploadImageParams = {
-      userUuid,
-      positionIndex,
-      bufferBase64: "buffer-base-64",
+      userUuid: expectedUserUuid,
+      positionIndex: expectedPositionIndex,
+      bufferBase64: expectedBufferBase64,
     };
 
     await settingsController.uploadImage(uploadImageParams);
 
     const [uploadParamsArgs] = mockAwsGateway.uploadImageToAWS.firstCall.args;
-    expect(uploadParamsArgs.bufferBase64).equal(uploadImageParams.bufferBase64);
-    expect(uploadParamsArgs.userUuid).equal(uploadImageParams.userUuid);
+    expect(uploadParamsArgs.bufferBase64).equal(expectedBufferBase64);
+    expect(uploadParamsArgs.userUuid).equal(expectedUserUuid);
 
     const [posIndex_1, userUuid_1] =
       mockRepo.getImageByIndexAndUserUuid.firstCall.args;
-    expect(posIndex_1).equal(positionIndex);
-    expect(userUuid_1).equal(userUuid);
+    expect(posIndex_1).equal(expectedPositionIndex);
+    expect(userUuid_1).equal(expectedUserUuid);
 
     const [imageRecord] = mockRepo.createImage.firstCall.args;
-    expect(imageRecord.user_uuid).equal(userUuid);
-    expect(imageRecord.media_storage_link).equal(mediaStorageLink);
-    expect(imageRecord.position_index).equal(positionIndex);
+    expect(imageRecord.user_uuid).equal(expectedUserUuid);
+
+    const expectedMediaStorageLink = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${imageRecord.media_storage_key}`;
+    expect(imageRecord.media_storage_link).equal(expectedMediaStorageLink);
+    expect(imageRecord.position_index).equal(expectedPositionIndex);
 
     expect(mockRepo.createImage.callCount).equal(1);
     expect(mockRepo.updateImage.callCount).equal(0);
@@ -63,19 +67,22 @@ describe("settings testing suite", () => {
   });
 
   it("create image, image already exists", async () => {
-    const mediaStorageLink = "media-storage-link";
-    const userUuid = "user-uuid";
-    const positionIndex = 0;
+    const expectedMediaStorageKey = "media-storage-key";
+
+    const expectedUserUuid = "user-uuid";
+    const expectedPositionIndex = 0;
+    const expectedBufferBase64 = "buffer-base-64";
 
     const mockAwsGateway = {
-      uploadImageToAWS: sinon.stub().returns(mediaStorageLink),
+      uploadImageToAWS: sinon.stub().returns(null),
     };
 
     const existingImage: ImageRecord = {
       uuid: "some-image-uuid",
-      user_uuid: userUuid,
-      media_storage_link: mediaStorageLink,
-      position_index: 0,
+      user_uuid: expectedUserUuid,
+      media_storage_link: "some-media-storage-link",
+      media_storage_key: expectedMediaStorageKey,
+      position_index: expectedPositionIndex,
     };
 
     const mockRepo = {
@@ -88,26 +95,28 @@ describe("settings testing suite", () => {
     settingsController.repo = mockRepo;
 
     const uploadImageParams = {
-      userUuid,
-      positionIndex,
-      bufferBase64: "buffer-base-64",
+      userUuid: expectedUserUuid,
+      positionIndex: expectedPositionIndex,
+      bufferBase64: expectedBufferBase64,
     };
 
     await settingsController.uploadImage(uploadImageParams);
 
     const [uploadParamsArgs] = mockAwsGateway.uploadImageToAWS.firstCall.args;
-    expect(uploadParamsArgs.bufferBase64).equal(uploadImageParams.bufferBase64);
-    expect(uploadParamsArgs.userUuid).equal(uploadImageParams.userUuid);
+    expect(uploadParamsArgs.bufferBase64).equal(expectedBufferBase64);
+    expect(uploadParamsArgs.userUuid).equal(expectedUserUuid);
 
     const [posIndex_1, userUuid_1] =
       mockRepo.getImageByIndexAndUserUuid.firstCall.args;
-    expect(posIndex_1).equal(positionIndex);
-    expect(userUuid_1).equal(userUuid);
+    expect(posIndex_1).equal(expectedPositionIndex);
+    expect(userUuid_1).equal(expectedUserUuid);
 
     const [imageRecord] = mockRepo.updateImage.firstCall.args;
-    expect(imageRecord.user_uuid).equal(userUuid);
-    expect(imageRecord.media_storage_link).equal(mediaStorageLink);
-    expect(imageRecord.position_index).equal(positionIndex);
+    expect(imageRecord.user_uuid).equal(expectedUserUuid);
+
+    const expectedMediaStorageLink = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${imageRecord.media_storage_key}`;
+    expect(imageRecord.media_storage_link).equal(expectedMediaStorageLink);
+    expect(imageRecord.position_index).equal(expectedPositionIndex);
 
     expect(mockRepo.createImage.callCount).equal(0);
     expect(mockRepo.updateImage.callCount).equal(1);

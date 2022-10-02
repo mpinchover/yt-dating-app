@@ -16,6 +16,7 @@ done
 
 export RUNTIME_ENV="UNIT_TEST" 
 export HOST="localhost"
+export BUCKET_NAME="TEST"
 
 echo "Starting server with runtime env: " $RUNTIME_ENV
 # docker volume prune -f

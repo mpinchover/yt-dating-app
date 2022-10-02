@@ -18,9 +18,8 @@ export class AWSGateway {
 
   buildS3ImageUploadObject = (params: uploadImageToAWSParams) => {
     const { bufferBase64, key } = params;
-    const uuid = params.newImageUuid;
     const data = {
-      key,
+      Key: key,
       Body: bufferBase64,
       ContentEncoding: "base64",
       ContentType: "image/jpeg",
@@ -30,20 +29,15 @@ export class AWSGateway {
   };
 
   // need to formate the key to return correct link
-  uploadImageToAWS = async (
-    params: uploadImageToAWSParams
-  ): Promise<string> => {
+  uploadImageToAWS = async (params: uploadImageToAWSParams) => {
     const uploadObject = this.buildS3ImageUploadObject(params);
-    await this.s3.putObject(uploadObject).Promise();
-    const { key } = uploadObject;
-    return key;
+    await this.s3.putObject(uploadObject).promise();
   };
 }
 
 export interface uploadImageToAWSParams {
   userUuid: string;
   bufferBase64: string;
-  newImageUuid: string;
   key: string;
 }
 

@@ -40,6 +40,10 @@ export class UserHandler {
     return like;
   };
 
+  getImagesByUserUuid = async (uuid: string) => {
+    return await this.userController.getImagesByUserUuid(uuid);
+  };
+
   createVideo = async (params: any) => {
     await this.userController.createVideo(params);
   };

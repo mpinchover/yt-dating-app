@@ -155,6 +155,10 @@ export class UserController {
     await this.repo.createBlockRecord(block);
   };
 
+  getImagesByUserUuid = async (uuid: string) => {
+    return await this.repo.getImagesByUserUuid(uuid);
+  };
+
   testUserRepoFn = () => {
     return "test-works..";
   };

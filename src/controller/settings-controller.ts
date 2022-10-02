@@ -8,10 +8,20 @@ import { v4 as uuidv4 } from "uuid";
 import { videoGatewayToRecord } from "../utils/mapper-video";
 import {
   DatingMatchPreferencesEntity,
-  DatingMatchPreferencesRecord,
   Gender,
   UserEntity,
 } from "../types/user";
+import {
+  SwapVideosParams,
+  UpdateUserParams,
+  UpdateUserParam,
+  UpdatesToMake,
+  UploadImageParams,
+  UpdatePasswordParams,
+  UpdateEmailParams,
+  UpdateMobileParams,
+  UserUpdateType,
+} from "../types/params/controller";
 import { ImageRecord } from "../types/image";
 
 @injectable()
@@ -30,7 +40,7 @@ export class SettingsController {
 
   // if not doing youtube history then
   // always have at least 5 media links
-  swapVideos = async (params: swapVideosParams) => {
+  swapVideos = async (params: SwapVideosParams) => {
     // first check to see if the video exists
     let newVideo = await this.repo.getVideoByVideoId(params.incomingVideoId);
     if (!newVideo) {
@@ -58,7 +68,7 @@ export class SettingsController {
 
   createUserPassword = async () => {};
 
-  updateUserSettings = async (params: updateUserParams) => {
+  updateUserSettings = async (params: UpdateUserParams) => {
     // run validation
 
     const user = await this.repo.getUserByUUID(params.userUuid);
@@ -67,26 +77,29 @@ export class SettingsController {
     const updatesToMake: UpdatesToMake = {};
     let dmpUpdates: DatingMatchPreferencesEntity = {}; // assign user uuid at the end
     let userUpdates: UserEntity = {}; // assign user uuid at the end.
+    const imageUpdates: UploadImageParams = {};
 
     // handle all user updates at the end
-    params.updates.forEach(async (update) => {
-      if (update.updateType === userUpdateType.UPDATE_EMAIL) {
+    for (let i = 0; i < params.updates.length; i++) {
+      const update: UpdateUserParam = params.updates[i];
+
+      if (update.updateType === UserUpdateType.UPDATE_EMAIL) {
         // userUpdates.uuid = user.uuid; assign the user uuid at the end
-        userUpdates.email = update.stringValue.value;
+        userUpdates.email = update.stringValue;
       }
-      if (update.updateType === userUpdateType.UPDATE_MOBILE) {
+      if (update.updateType === UserUpdateType.UPDATE_MOBILE) {
         const updateParams = {
           userUuid: params.userUuid,
-          mobile: update.stringValue.value,
+          mobile: update.stringValue,
         };
 
         await this.updateMobile(updateParams);
       }
-      if (update.updateType === userUpdateType.UPDATE_PASSWORD) {
+      if (update.updateType === UserUpdateType.UPDATE_PASSWORD) {
         const updateParams = {
           userUuid: params.userUuid,
-          password: update.password.password,
-          confirmPassword: update.password.confirmPassword,
+          password: update.passwordValue.password,
+          confirmPassword: update.passwordValue.confirmPassword,
         };
 
         await this.updatePassword(updateParams);
@@ -94,35 +107,43 @@ export class SettingsController {
 
       // dating pref
       // get all the updates to the dating prefs and do them in one query
-      if (update.updateType === userUpdateType.UPDATE_MAX_AGE) {
-        dmpUpdates.ageMaxPreference = update.numberValue.value;
+      if (update.updateType === UserUpdateType.UPDATE_MAX_AGE) {
+        dmpUpdates.ageMaxPreference = update.numberValue;
       }
 
-      if (update.updateType === userUpdateType.UPDATE_MIN_AGE) {
-        dmpUpdates.ageMinPreference = update.numberValue.value;
+      if (update.updateType === UserUpdateType.UPDATE_MIN_AGE) {
+        dmpUpdates.ageMinPreference = update.numberValue;
       }
 
-      if (update.updateType === userUpdateType.UPDATE_GENDER_PREFERENCE) {
-        dmpUpdates.genderPreference = Gender[update.stringValue.value];
+      if (update.updateType === UserUpdateType.UPDATE_GENDER_PREFERENCE) {
+        dmpUpdates.genderPreference = Gender[update.stringValue];
       }
 
       // youtube
-      if (update.updateType === userUpdateType.ADD_YOUTUBE_LINKS) {
+      if (update.updateType === UserUpdateType.UPLOAD_YOUTUBE_LINKS) {
       }
 
-      if (update.updateType === userUpdateType.SWAP_YOUTUBE_LINKS) {
+      if (update.updateType === UserUpdateType.SWAP_YOUTUBE_LINKS) {
       }
 
       // pictures
-      if (update.updateType === userUpdateType.ADD_PICTURES) {
+      if (update.updateType === UserUpdateType.UPLOAD_IMAGE) {
+        const imageUpdateParams = {
+          userUuid: user.uuid,
+          ...update.uploadImageParams,
+        };
+
+        try {
+          await this.uploadImage(imageUpdateParams);
+        } catch (e) {
+          console.log(e);
+          throw e;
+        }
       }
 
-      if (update.updateType === userUpdateType.SWAP_PICTURES) {
+      if (update.updateType === UserUpdateType.UPDATE_PICTURE_ORDER) {
       }
-
-      if (update.updateType === userUpdateType.UPDATE_PICTURE_ORDER) {
-      }
-    });
+    }
 
     // if updates were made to the user updates, add in the user uuid and make the u
     if (Object.keys(userUpdates).length > 0) {
@@ -133,22 +154,26 @@ export class SettingsController {
       updatesToMake.datingPreferencesUpdates = dmpUpdates;
     }
 
+    if (Object.keys(imageUpdates).length > 0) {
+      updatesToMake.imageUpdates = imageUpdates;
+    }
+
     // call the repo function to make the updates in a transaction
     // updateUserSettingsInTx(updatesToMake)
   };
 
-  updatePassword = async (params: updatePasswordParams) => {
+  updatePassword = async (params: UpdatePasswordParams) => {
     const { userUuid, password, confirmPassword } = params;
     // validation check
     return null;
   };
 
-  updateEmail = async (params: updateEmailParams) => {
+  updateEmail = async (params: UpdateEmailParams) => {
     const { userUuid, email } = params;
     return null;
   };
 
-  updateMobile = async (params: updateMobileParams) => {
+  updateMobile = async (params: UpdateMobileParams) => {
     const { userUuid, mobile } = params;
     return null;
   };
@@ -168,10 +193,8 @@ export class SettingsController {
     // – make sure index of image is within 1 - 4
     // - make sure all params are present
     // upload an image
-
     const { userUuid, bufferBase64 } = params;
     const newImageUuid = uuidv4();
-    let mediaStorageLink;
     const key = `public/users/${userUuid}/profile_pictures/${newImageUuid}`;
 
     const uploadImageParams = {
@@ -180,104 +203,46 @@ export class SettingsController {
       bufferBase64,
       key,
     };
+
     try {
-      mediaStorageLink = await this.awsGateway.uploadImageToAWS(
-        uploadImageParams
-      );
+      await this.awsGateway.uploadImageToAWS(uploadImageParams);
     } catch (e) {
-      throw new Error(`failed to upload image to s3, ${e.message}`);
+      console.log(e);
+      throw e;
     }
 
-    // check if image already exists at this index, if so just replace it
-    const existingImage = await this.repo.getImageByIndexAndUserUuid(
-      params.positionIndex,
-      params.userUuid
-    );
+    const mediaLink = `https://${process.env.BUCKET_NAME}.s3.amazonaws.com/${key}`;
 
-    if (existingImage) {
-      existingImage.media_storage_link = mediaStorageLink;
-      return await this.repo.updateImage(existingImage);
+    try {
+      // check if image already exists at this index, if so just replace it
+      const existingImage = await this.repo.getImageByIndexAndUserUuid(
+        params.positionIndex,
+        params.userUuid
+      );
+
+      if (existingImage) {
+        existingImage.media_storage_key = key;
+        existingImage.media_storage_link = mediaLink;
+        return await this.repo.updateImage(existingImage);
+      }
+    } catch (e) {
+      console.log(e);
+      throw e;
     }
 
     // no existing image, create a new one
     const imageRecord: ImageRecord = {
       uuid: uuidv4(),
       user_uuid: params.userUuid,
-      media_storage_link: mediaStorageLink,
+      media_storage_key: key,
+      media_storage_link: mediaLink,
       position_index: params.positionIndex,
     };
-    await this.repo.createImage(imageRecord);
+    try {
+      await this.repo.createImage(imageRecord);
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
   };
-}
-
-export interface UploadImageParams {
-  userUuid: string;
-  positionIndex: number;
-  bufferBase64: string;
-}
-
-export interface updatePasswordParams {
-  userUuid: string;
-  password: string;
-  confirmPassword: string;
-}
-
-export interface updateEmailParams {
-  userUuid: string;
-  email: string;
-}
-
-export interface updateMobileParams {
-  userUuid: string;
-  mobile: string;
-}
-
-enum userUpdateType {
-  UPDATE_PASSWORD,
-  UPDATE_EMAIL,
-  UPDATE_MOBILE,
-  UPDATE_MAX_AGE,
-  UPDATE_MIN_AGE,
-  UPDATE_GENDER_PREFERENCE,
-  ADD_YOUTUBE_LINKS,
-  SWAP_YOUTUBE_LINKS,
-  ADD_PICTURES, // min 6 pics required
-  SWAP_PICTURES,
-  UPDATE_PICTURE_ORDER,
-}
-
-interface UpdatesToMake {
-  userUpdates?: UserEntity;
-  datingPreferencesUpdates?: DatingMatchPreferencesEntity;
-}
-
-interface updateUserStringValue {
-  value: string;
-}
-
-interface updateUserNumberValue {
-  value: number;
-}
-
-interface updateUserPasswordValue {
-  password: string;
-  confirmPassword: string;
-}
-
-interface updateUserParam {
-  updateType: userUpdateType;
-  stringValue: updateUserStringValue;
-  numberValue: updateUserNumberValue;
-  password: updateUserPasswordValue;
-}
-
-interface updateUserParams {
-  userUuid: string;
-  updates: updateUserParam[];
-}
-
-interface swapVideosParams {
-  userUuid: string;
-  incomingVideoId: string; // the youtube ID
-  videoToBeReplacedUuid: string;
 }

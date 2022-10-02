@@ -6,6 +6,7 @@ export interface ImageRecord {
   uuid: string;
   user_uuid: string;
   media_storage_link: string;
+  media_storage_key: string;
   position_index: number;
 }
 
