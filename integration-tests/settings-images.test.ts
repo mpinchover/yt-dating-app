@@ -51,6 +51,23 @@ describe("settings testing suite", () => {
     // upload 4 images
     // TODO - make sure that when you update a user, rest of the fields are not mutated
 
+    const invalidUpdates: UpdateUserParam[] = [
+      {
+        updateType: "invalid-update",
+        uploadImageParams: {
+          bufferBase64: firstImageBase64,
+          positionIndex: 0,
+        },
+      },
+    ];
+    const paramsInvalidUpdates: UpdateUserParams = {
+      userUuid,
+      updates: invalidUpdates,
+    };
+    await expect(
+      settingsHandler.updateUser(paramsInvalidUpdates)
+    ).to.be.rejectedWith(Error);
+
     const updatesImageOne: UpdateUserParam[] = [
       {
         updateType: UserUpdateType[UserUpdateType.UPLOAD_IMAGE],
