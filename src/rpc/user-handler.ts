@@ -43,10 +43,6 @@ export class UserHandler {
   getImagesByUserUuid = async (uuid: string) => {
     return await this.userController.getImagesByUserUuid(uuid);
   };
-
-  createVideo = async (params: any) => {
-    await this.userController.createVideo(params);
-  };
 }
 // https://github.com/microsoft/tsyringe
 

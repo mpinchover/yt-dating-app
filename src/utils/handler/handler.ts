@@ -1,5 +1,5 @@
 import * as handler from "../../types/params/handler";
-import * as entity from "../../types/params/controller";
+import * as entity from "../../types/params/entity";
 // TODO – move mapper to it's own file and map everything, don't be lazy
 export const UpdateUserRequestToEntity = (
   params: handler.UpdateUserParams
@@ -25,11 +25,8 @@ const updateUserParamsHandlerToEntity = (
 const updateUserParamHandlerToEntity = (
   update: handler.UpdateUserParam
 ): entity.UpdateUserParam => {
-  const updateType = entity.UserUpdateType[update.updateType];
-  if (!updateType) throw new Error("invalid update type");
-
   const res: entity.UpdateUserParam = {
-    updateType,
+    updateType: update.updateType,
     stringValue: update.stringValue,
     numberValue: update.numberValue,
     passwordValue: update.passwordValue,

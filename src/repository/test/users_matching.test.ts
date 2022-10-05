@@ -1,12 +1,11 @@
 require("reflect-metadata");
-import {
-  // DatingMatchPreferencesEntity,
-  // UserEntity,
-  // UserRecord,
-  // DatingMatchPreferencesRecord,
-  // UserSearchFilter,
-  Gender,
-} from "../../types/user";
+import // DatingMatchPreferencesEntity,
+// UserEntity,
+// UserRecord,
+// DatingMatchPreferencesRecord,
+// UserSearchFilter,
+// Gender,
+"../../types/user";
 import { v4 as uuidv4 } from "uuid";
 
 const { Repo } = require("../repo");
@@ -62,8 +61,8 @@ describe("get matching users test suite", () => {
     await createUserInDB(r, biWoman);
 
     const filter = {
-      gender: Gender.WOMAN, // should be their gender
-      genderPreference: Gender.MAN, // lloking for a woman
+      gender: "WOMAN", // should be their gender
+      genderPreference: "MAN", // lloking for a woman
       ageMin: 22, // what their age min should be
       ageMax: 60, // what their age max should be
       age: 43, // my age, so you can make sure their min and max ages prefs are in this range.

@@ -4,7 +4,7 @@ import {
   UserRecord,
   DatingMatchPreferencesRecord,
   UserSearchFilter,
-  Gender,
+  // Gender,
 } from "../types/user";
 import { ImageRecord } from "../types/image";
 import { MatchRecord, BlockRecord, LikeRecord } from "../types/match";
@@ -345,7 +345,7 @@ export class Repo {
     return rows[0];
   };
 
-  _createUser = async (params: UserRecord) => {
+  createUser = async (params: UserRecord) => {
     try {
       await this.getMySQLConnection();
 
@@ -356,12 +356,16 @@ export class Repo {
     }
   };
 
-  createUser = async (params: UserRecord) => {
-    // await this.db.collection("users").insertOne(params);
+  createUserInTx = async (params: UserRecord) => {
     try {
       await this.getMySQLConnection();
+      await this.db.beginTransaction();
 
-      await this._createUser(params);
+      await this.createUser(params);
+      if (params.dating_preference)
+        await this.createDatingPreferencesRecord(params.dating_preference);
+
+      await this.db.commit();
     } catch (e) {
       console.log(e);
       throw e;
@@ -394,6 +398,7 @@ export class Repo {
       const dmp = await this.getDatingPreferencesByUserUuid(uuid);
       rows[0].videos = videos;
       rows[0].dating_preference = dmp;
+
       return rows[0];
     } catch (e) {
       throw e;
@@ -481,21 +486,18 @@ export class Repo {
     } = filters;
 
     // what their gender should be.
-    let userGenderShouldBe;
-    if (gender === Gender.MAN) {
-      userGenderShouldBe = [Gender[Gender.MAN]];
-    } else if (gender == Gender.WOMAN) {
-      userGenderShouldBe = [Gender[Gender.WOMAN]];
-    } else {
+    // TODO – add this to valdiation
+    if (gender !== "MAN" && gender !== "WOMAN") {
       throw new Error("invalid selection for gender search query");
     }
 
     // what their gender pref should be
+    // TODO – add this to validation
     let userGenderPrefShouldBe;
-    if (genderPreference === Gender.MAN) {
-      userGenderPrefShouldBe = [Gender[Gender.MAN], Gender[Gender.BOTH]];
-    } else if (genderPreference === Gender.WOMAN) {
-      userGenderPrefShouldBe = [Gender[Gender.WOMAN], Gender[Gender.BOTH]];
+    if (genderPreference === "MAN") {
+      userGenderPrefShouldBe = ["MAN", "BOTH"];
+    } else if (genderPreference === "WOMAN") {
+      userGenderPrefShouldBe = ["WOMAN", "BOTH"];
     } else {
       throw new Error("invalid selection for gender preference");
     }
@@ -504,7 +506,7 @@ export class Repo {
     let query = `
     select u.* from users u 
     join dating_match_preferences dmp on
-      dmp.gender in (?) and 
+      dmp.gender = ? and 
       dmp.gender_preference in (?) and
       dmp.age >= ? and
       dmp.age <= ? and
@@ -517,7 +519,7 @@ export class Repo {
 
     // need to do some processing on the gender
     let [rows, fields] = await this.db.query(query, [
-      userGenderShouldBe, // their gender matches my gender preference
+      gender, // their gender matches my gender preference
       userGenderPrefShouldBe, // my gender is in their gender preferences
       ageMin,
       ageMax,
@@ -625,6 +627,22 @@ export class Repo {
     const [rows, fields] = await this.db.query(query, [uuid]);
     if (rows.length == 0) return null;
     return rows;
+  };
+
+  updateUser = async (params: UserRecord) => {
+    await this.getMySQLConnection();
+
+    const query = "update users set ? where uuid = ?";
+    await this.db.query(query, [params, params.uuid]);
+  };
+
+  updateDatingMatchPreferences = async (
+    params: DatingMatchPreferencesRecord
+  ) => {
+    await this.getMySQLConnection();
+
+    const query = "update dating_match_preferences set ? where user_uuid = ?";
+    await this.db.query(query, [params, params.user_uuid]);
   };
 }
 /*

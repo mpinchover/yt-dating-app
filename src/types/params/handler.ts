@@ -21,3 +21,4 @@ export interface UploadImageParams {
   positionIndex?: number;
   bufferBase64?: string;
 }
+

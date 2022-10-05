@@ -6,6 +6,11 @@ export interface UploadImageParams {
   bufferBase64?: string;
 }
 
+// TODO – add in way to differentiate youtube link from something else
+export interface UpdateMediaParams {
+  mediaId?: string;
+}
+
 export interface UpdatePasswordParams {
   userUuid: string;
   password: string;
@@ -20,6 +25,10 @@ export interface UpdateEmailParams {
 export interface UpdateMobileParams {
   userUuid: string;
   mobile: string;
+}
+export interface AddMediaLinkParams {
+  userUuid: string;
+  mediaId: string;
 }
 
 export enum UserUpdateType {
@@ -48,7 +57,7 @@ export interface UpdateUserPasswordValue {
 }
 
 export interface UpdateUserParam {
-  updateType: UserUpdateType;
+  updateType: string;
   stringValue: string;
   numberValue: number;
   passwordValue: UpdateUserPasswordValue;

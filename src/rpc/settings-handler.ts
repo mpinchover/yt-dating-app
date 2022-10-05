@@ -17,4 +17,8 @@ export class SettingsHandler {
     const paramsEntity = UpdateUserRequestToEntity(params);
     await this.settingsController.updateUserSettings(paramsEntity);
   };
+
+  createVideo = async (params: any) => {
+    await this.settingsController.createVideo(params);
+  };
 }

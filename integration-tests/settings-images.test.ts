@@ -12,7 +12,7 @@ import { UpdateUserParams, UpdateUserParam } from "../src/types/params/handler";
 import {
   UserUpdateType,
   UploadImageParams,
-} from "../src/types/params/controller";
+} from "../src/types/params/entity";
 import { UserHandler } from "../src/rpc/user-handler";
 
 describe("settings testing suite", () => {
@@ -137,7 +137,7 @@ describe("settings testing suite", () => {
     ).to.not.be.rejectedWith();
 
     // TODO – don't use enums, you need to use the string values.
-    let images = await userHandler.getImagesByUserUuid(userUuid);
+    const images = await userHandler.getImagesByUserUuid(userUuid);
     expect(images).to.not.be.null;
     expect(4).equal(images.length);
     // TODO – test to make sure media link is working correctly.
@@ -145,6 +145,9 @@ describe("settings testing suite", () => {
     expect(1).equal(images[1].position_index);
     expect(2).equal(images[2].position_index);
     expect(3).equal(images[3].position_index);
+    expect(
+      settingsHandler.settingsController.awsGateway.uploadImageToAWS.callCount
+    ).equal(4);
 
     // do an update
     const updateToImageFour: UpdateUserParam[] = [
@@ -164,13 +167,29 @@ describe("settings testing suite", () => {
       settingsHandler.updateUser(paramsupdateToImageFour)
     ).to.not.be.rejectedWith();
 
-    images = await userHandler.getImagesByUserUuid(userUuid);
-    expect(images).to.not.be.null;
-    expect(4).equal(images.length);
+    const imagesPostUpdate = await userHandler.getImagesByUserUuid(userUuid);
+    expect(imagesPostUpdate).to.not.be.null;
+    expect(4).equal(imagesPostUpdate.length);
 
-    expect(0).equal(images[0].position_index);
-    expect(1).equal(images[1].position_index);
-    expect(2).equal(images[2].position_index);
-    expect(3).equal(images[3].position_index);
+    expect(0).equal(imagesPostUpdate[0].position_index);
+    expect(1).equal(imagesPostUpdate[1].position_index);
+    expect(2).equal(imagesPostUpdate[2].position_index);
+    expect(3).equal(imagesPostUpdate[3].position_index);
+
+    expect(images[0].media_storage_key).equal(
+      imagesPostUpdate[0].media_storage_key
+    );
+    expect(images[1].media_storage_key).equal(
+      imagesPostUpdate[1].media_storage_key
+    );
+    expect(images[2].media_storage_key).equal(
+      imagesPostUpdate[2].media_storage_key
+    );
+    expect(images[3].media_storage_key).not.equal(
+      imagesPostUpdate[3].media_storage_key
+    );
+    expect(
+      settingsHandler.settingsController.awsGateway.uploadImageToAWS.callCount
+    ).equal(5);
   });
 });

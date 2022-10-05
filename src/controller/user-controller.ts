@@ -47,53 +47,16 @@ export class UserController {
       mobile: params.mobile,
       email: params.email,
       verified: false,
+      datingPreference: params.datingPreferences,
     };
 
     // convert to userRecord
     const userRecord = userEntityToRecord(userEntity);
-    await this.repo.createUser(userRecord);
+    await this.repo.createUserInTx(userRecord);
   };
 
   deleteUser = async (params: deleteUserParams) => {
     await this.repo.deleteUserByUuid(params.uuid);
-  };
-
-  createVideo = async (params: addMediaLinkParams) => {
-    try {
-      let videoRecord: VideoRecord = await this.repo.getVideoByVideoId(
-        params.mediaId
-      );
-      // if the video record exists, just create the treacked video record
-      if (videoRecord) {
-        const trackedVideoRecord: TrackedVideoRecord = {
-          uuid: uuidv4(),
-          video_uuid: videoRecord.uuid,
-          user_uuid: params.userUuid,
-        };
-        await this.repo.createTrackedVideoRecord(trackedVideoRecord);
-        return;
-      }
-
-      const videoDetails = await this.youtubeGateway.getYoutubeDetailsByVideoId(
-        params.mediaId
-      );
-      videoRecord = videoGatewayToRecord(videoDetails);
-      videoRecord.uuid = uuidv4();
-
-      const trackedVideoRecord: TrackedVideoRecord = {
-        uuid: uuidv4(),
-        video_uuid: videoRecord.uuid,
-        user_uuid: params.userUuid,
-      };
-      // create video record and tracked video record in tx
-      await this.repo.createVideoAndTrackedVideoInTx(
-        videoRecord,
-        trackedVideoRecord
-      );
-    } catch (e) {
-      console.log(e);
-      throw e;
-    }
   };
 
   likeUser = async (params: likeProfileParams) => {
@@ -172,6 +135,7 @@ interface createUserParams {
   mobile?: string;
   email?: string;
   uuid?: string;
+  datingPreferences: DatingMatchPreferencesEntity;
 }
 
 interface getProfileByUUIDParams {
@@ -181,11 +145,6 @@ interface getProfileByUUIDParams {
 interface likeProfileParams {
   initiatorUuid: string;
   receiverUuid: string;
-}
-
-interface addMediaLinkParams {
-  userUuid: string;
-  mediaId: string;
 }
 
 interface blockUserByUuidParams {

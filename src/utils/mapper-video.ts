@@ -2,7 +2,7 @@ import { VideoRecord, VideoEntity } from "../types/video";
 
 export const videoGatewayToRecord = (params: any): VideoRecord => {
   if (!params) throw new Error("youtube video cannot be null");
-  
+
   const videoRecord: VideoRecord = {
     video_id: params.videoId,
     channel_id: params.channelId,
@@ -28,16 +28,17 @@ export const videoRecordsToEntities = (
 export const videoRecordToEntity = (params: VideoRecord): VideoEntity => {
   if (!params) throw new Error("video record cannot be null");
 
-  const videoEntity = {
-    uuid: params.uuid,
-    videoId: params.video_id,
-    channelId: params.channel_id,
-    videoTitle: params.video_title,
-    videoDescription: params.video_description,
-    categoryId: params.category_id,
-    topicCategories: JSON.parse(params.topic_categories),
-  };
-  return videoEntity;
+  const res: VideoEntity = {};
+  if (params.uuid) res.uuid = params.uuid;
+  if (params.video_id) res.videoId = params.video_id;
+  if (params.channel_id) res.channelId = params.channel_id;
+  if (params.video_title) res.videoTitle = params.video_title;
+  if (params.video_description) res.videoDescription = params.video_description;
+  if (params.category_id) res.categoryId = params.category_id;
+  if (params.topic_categories)
+    res.topicCategories = JSON.parse(params.topic_categories);
+
+  return res;
 };
 
 // /*
